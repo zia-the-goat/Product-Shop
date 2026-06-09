@@ -1,4 +1,5 @@
 package com.example.productshop
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -7,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -31,17 +33,16 @@ interface ProductService {
     suspend fun getProducts(): List<ProductDto>
 }
 
-// 3. Retrofit Instance
-object RetrofitClient {
-    private const val BASE_URL = "http://10.0.2.2:8080/v1/" // 10.0.2.2 is localhost for Android Emulator
-
-    val instance: ProductService by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
+// 3. Dynamic Retrofit Management
+class RetrofitManager(initialIp: String) {
+    var currentIp by mutableStateOf(initialIp)
+    
+    val service: ProductService
+        get() = Retrofit.Builder()
+            .baseUrl("$currentIp/v1/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ProductService::class.java)
-    }
 }
 
 // 4. ViewModel to manage state
@@ -49,14 +50,17 @@ class ProductViewModel : ViewModel() {
     var products by mutableStateOf<List<ProductDto>>(emptyList())
     var isLoading by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
+    
+    // Default to Emulator IP, but allows changing
+    val retrofitManager = RetrofitManager("https://boozy-supply-ripping.ngrok-free.dev")
 
     suspend fun fetchProducts() {
         isLoading = true
         try {
-            products = RetrofitClient.instance.getProducts()
+            products = retrofitManager.service.getProducts()
             errorMessage = null
         } catch (e: Exception) {
-            errorMessage = "Failed to load products: ${e.message}"
+            errorMessage = "Failed to load products from ${retrofitManager.currentIp}: ${e.message}"
         } finally {
             isLoading = false
         }
@@ -77,25 +81,39 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductScreen(viewModel: ProductViewModel = viewModel()) {
+    val scope = rememberCoroutineScope()
+
     // Fetch products when the screen loads
     LaunchedEffect(Unit) {
         viewModel.fetchProducts()
     }
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text(text = "Product Shop", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (viewModel.isLoading) {
-            CircularProgressIndicator()
-        } else if (viewModel.errorMessage != null) {
-            Text(text = viewModel.errorMessage!!, color = MaterialTheme.colorScheme.error)
-        } else {
-            LazyColumn {
-                items(viewModel.products) { product ->
-                    ProductItem(product)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Product Shop") }
+            )
+        }
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+            if (viewModel.isLoading) {
+                CircularProgressIndicator()
+            } else if (viewModel.errorMessage != null) {
+                Text(text = viewModel.errorMessage!!, color = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = { 
+                    scope.launch { viewModel.fetchProducts() } 
+                }) {
+                    Text("Retry")
+                }
+            } else {
+                LazyColumn {
+                    items(viewModel.products) { product ->
+                        ProductItem(product)
+                    }
                 }
             }
         }
