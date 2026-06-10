@@ -41,7 +41,7 @@ fun ProductDetailScreen(
 ) {
     val product = viewModel.products.find { it.id == productId }
     var isExpanded by remember { mutableStateOf(false) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     if (product == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -112,11 +112,29 @@ fun ProductDetailScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            MediumTopAppBar(
-                title = { /* Empty title to avoid redundancy with the body title */ },
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                tonalElevation = 8.dp,
+                shadowElevation = 16.dp,
+                color = MaterialTheme.colorScheme.surface)
+            {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = product.name,
+                        modifier = Modifier.padding(8.dp),
+                        maxLines = 2,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Return to products")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Return to products"
+                        )
                     }
                 },
                 actions = {
@@ -124,8 +142,14 @@ fun ProductDetailScreen(
                         Icon(Icons.Default.Share, contentDescription = "Share product")
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f)
+                )
+                ,
                 scrollBehavior = scrollBehavior
             )
+        }
         },
         bottomBar = {
             Surface(
@@ -190,11 +214,6 @@ fun ProductDetailScreen(
             }
 
             Column(modifier = Modifier.padding(24.dp)) {
-                Text(
-                    text = product.name,
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
 
                 val description = product.description
                 val annotatedString = buildAnnotatedString {

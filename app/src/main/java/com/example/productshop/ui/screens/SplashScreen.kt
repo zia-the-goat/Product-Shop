@@ -39,7 +39,7 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     )
 
     LaunchedEffect(holdProgress.value) {
-        if (holdProgress.value >= 1f) {
+        if (holdProgress.value >= 0.5f) {
             onSplashFinished()
         }
     }
