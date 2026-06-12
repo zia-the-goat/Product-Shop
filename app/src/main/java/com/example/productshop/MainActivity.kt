@@ -1,8 +1,8 @@
 package com.example.productshop
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -14,8 +14,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.productshop.ui.screens.DiscoverScreen
 import com.example.productshop.ui.screens.LandingScreen
 import com.example.productshop.ui.screens.LoginScreen
+import com.example.productshop.ui.screens.SignupScreen
 import com.example.productshop.ui.screens.ProductDetailScreen
 import com.example.productshop.ui.screens.SplashScreen
+import com.example.productshop.ui.viewmodel.AuthViewModel
 import com.example.productshop.ui.viewmodel.ProductViewModel
 
 private val AppBlueTheme = lightColorScheme(
@@ -33,7 +35,7 @@ private val AppBlueTheme = lightColorScheme(
     error = Color(0xFFBA1A1A)
 )
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -53,35 +55,57 @@ enum class Screen {
     Splash,
     Landing,
     Login,
+    Signup,
     Discover,
     Detail
 }
 
 @Composable
-fun ProductApp(viewModel: ProductViewModel = viewModel()) {
+fun ProductApp(
+    viewModel: ProductViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
+) {
     var currentScreen by remember { mutableStateOf(Screen.Splash) }
     var selectedProductId by remember { mutableStateOf<Long?>(null) }
 
     when (currentScreen) {
         Screen.Splash -> {
             SplashScreen(onSplashFinished = {
-                currentScreen = Screen.Login // Screen.Landing
+                currentScreen = Screen.Landing
             })
         }
         Screen.Landing -> {
-            LandingScreen(onGetStarted = {
-                currentScreen = Screen.Login
-            })
+            LandingScreen(
+                onContinueAsGuest = {
+                    currentScreen = Screen.Discover
+                },
+                onLogin = {
+                    authViewModel.resetState()
+                    currentScreen = Screen.Login
+                },
+                onSignUp = {
+                    authViewModel.resetState()
+                    currentScreen = Screen.Signup
+                }
+            )
         }
         Screen.Login -> {
-            LoginScreen(onContinueAsGuest = {
-                currentScreen = Screen.Discover
-            })
+            LoginScreen(
+                viewModel = authViewModel,
+                onBack = { currentScreen = Screen.Landing },
+                onLoginSuccess = { currentScreen = Screen.Discover }
+            )
+        }
+        Screen.Signup -> {
+            SignupScreen(
+                viewModel = authViewModel,
+                onBack = { currentScreen = Screen.Landing }
+            )
         }
         Screen.Discover -> {
             DiscoverScreen(
                 viewModel = viewModel,
-                onProductClick = { id -> 
+                onProductClick = { id ->
                     selectedProductId = id
                     currentScreen = Screen.Detail
                 }
@@ -92,7 +116,7 @@ fun ProductApp(viewModel: ProductViewModel = viewModel()) {
                 ProductDetailScreen(
                     productId = id,
                     viewModel = viewModel,
-                    onBack = { 
+                    onBack = {
                         currentScreen = Screen.Discover
                         selectedProductId = null
                     }
