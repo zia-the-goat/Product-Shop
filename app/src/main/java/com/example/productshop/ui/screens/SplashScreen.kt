@@ -1,5 +1,6 @@
 package com.example.productshop.ui.screens
 
+import android.media.SoundPool
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -26,6 +28,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.productshop.R
+import kotlinx.coroutines.delay
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 @Composable
@@ -93,7 +100,7 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = if (isHolding) "Authorizing..." else "Hold fingerprint to enter",
+                text = if (isHolding) "Initializing..." else "Hold fingerprint to enter",
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 14.sp
             )
@@ -135,7 +142,7 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
 
                 Icon(
                     imageVector = Icons.Default.Fingerprint,
-                    contentDescription = null,
+                    contentDescription = "Security fingerprint lock. Hold to unlock.",
                     modifier = Modifier.size(80.dp),
                     tint = fingerprintColor
                 )
@@ -147,55 +154,127 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
 
 @Composable
 fun BubbleBackground() {
-    val infiniteTransition = rememberInfiniteTransition(label = "bubbles")
-    
-    // Create 100 bubbles (Standardized count)
-    val bubbles = remember {
-        List(100) {
-            BubbleData(
-                startX = Random.nextFloat(),
-                startY = Random.nextFloat(),
-                size = Random.nextFloat() * 15f + 5f,
-                speedX = (Random.nextFloat() - 0.5f) * 0.1f,
-                speedY = (Random.nextFloat() - 0.5f) * 0.1f
-            )
+    val context = LocalContext.current
+    val soundPool = remember {
+        SoundPool.Builder().setMaxStreams(10).build()
+    }
+    val popSoundId = remember { soundPool.load(context, R.raw.pop, 1) }
+    val spawnSoundId = remember { soundPool.load(context, R.raw.spawn, 1) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            soundPool.release()
         }
     }
 
-    val time by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(20000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "time"
-    )
+    var bubbles by remember {
+        mutableStateOf(List(50) {
+            createBubble()
+        })
+    }
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
+    LaunchedEffect(Unit) {
+        var time = 0f
+        while (true) {
+            delay(16) // ~60 FPS
+            time += 0.016f
+            bubbles = bubbles.map { bubble ->
+                // Fluid/Water-like drift using sine waves
+                val driftX = sin(time + bubble.phase) * 0.0005f
+                val driftY = cos(time + bubble.phase) * 0.0005f
+                
+                val newX = (bubble.x + bubble.speedX + driftX) % 1.0f
+                val newY = (bubble.y + bubble.speedY + driftY) % 1.0f
+                
+                // If bubble reaches random pop (2 per sec total across 50 bubbles)
+                // 2 / 60 / 50 = 0.00067
+                if (Random.nextFloat() < 0.00067f) { 
+                    createBubble()
+                } else {
+                    bubble.copy(
+                        x = if (newX < 0) newX + 1f else newX,
+                        y = if (newY < 0) newY + 1f else newY
+                    )
+                }
+            }
+        }
+    }
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { offset ->
+                        val clickedBubbleIndex = bubbles.indexOfFirst { bubble ->
+                            val bX = bubble.x * size.width
+                            val bY = bubble.y * size.height
+                            val dist = sqrt((offset.x - bX) * (offset.x - bX) + (offset.y - bY) * (offset.y - bY))
+                            dist < (bubble.size + 10).dp.toPx()
+                        }
+                        if (clickedBubbleIndex != -1) {
+                            soundPool.play(popSoundId, 0.6f, 0.6f, 1, 0, 1.0f)
+                            val newBubbles = bubbles.toMutableList()
+                            newBubbles[clickedBubbleIndex] = createBubble()
+                            bubbles = newBubbles
+                        }
+                    }
+                )
+            }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        event.changes.forEach { change ->
+                            // Use positionChange().getDistance() > 10 to reduce frequency
+                            val distance = (change.position - change.previousPosition).getDistance()
+                            if (change.pressed && distance > 15f) {
+                                // Spawn a new bubble at the touch location
+                                val newBubble = createBubble(
+                                    x = change.position.x / size.width.toFloat(),
+                                    y = change.position.y / size.height.toFloat()
+                                )
+                                soundPool.play(spawnSoundId, 0.2f, 0.2f, 1, 0, 1.0f)
+                                bubbles = (bubbles + newBubble).takeLast(150)
+                                change.consume()
+                            }
+                        }
+                    }
+                }
+            }
+    ) {
         bubbles.forEach { bubble ->
-            val currentX = (bubble.startX + bubble.speedX * time * 20) % 1.0f
-            val currentY = (bubble.startY + bubble.speedY * time * 20) % 1.0f
-            
-            val x = if (currentX < 0) currentX + 1f else currentX
-            val y = if (currentY < 0) currentY + 1f else currentY
-
             drawCircle(
                 color = Color.White.copy(alpha = 0.12f),
                 radius = bubble.size.dp.toPx(),
                 center = Offset(
-                    x = size.width * x,
-                    y = size.height * y
+                    x = size.width * bubble.x,
+                    y = size.height * bubble.y
                 )
             )
         }
     }
 }
 
+private fun createBubble(
+    x: Float = Random.nextFloat(),
+    y: Float = Random.nextFloat()
+): BubbleData {
+    return BubbleData(
+        x = x,
+        y = y,
+        size = Random.nextFloat() * 15f + 5f,
+        speedX = (Random.nextFloat() - 0.5f) * 0.0015f,
+        speedY = (Random.nextFloat() - 0.5f) * 0.0015f,
+        phase = Random.nextFloat() * 2f * Math.PI.toFloat()
+    )
+}
+
 data class BubbleData(
-    val startX: Float,
-    val startY: Float,
+    val x: Float,
+    val y: Float,
     val size: Float,
     val speedX: Float,
-    val speedY: Float
+    val speedY: Float,
+    val phase: Float
 )

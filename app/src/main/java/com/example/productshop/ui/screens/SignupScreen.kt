@@ -6,7 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -49,7 +49,9 @@ fun SignupScreen(
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var idNumber by remember { mutableStateOf("") }
+    var customerTypeId by remember { mutableStateOf(1L) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var otp by remember { mutableStateOf("") }
 
     // Validation State
     var emailDirty by remember { mutableStateOf(false) }
@@ -64,7 +66,7 @@ fun SignupScreen(
     val isEmailValid = email.matches(emailRegex)
     val isFirstNameValid = firstName.isNotBlank()
     val isLastNameValid = lastName.isNotBlank()
-    val isIdNumberValid = idNumber.length >= 6 && idNumber.all { it.isDigit() }
+    val isIdNumberValid = idNumber.length == 13 && idNumber.all { it.isDigit() }
     
     val passwordRequirements = remember(password) {
         listOf(
@@ -80,6 +82,7 @@ fun SignupScreen(
     val uiState = viewModel.uiState
     val scrollState = rememberScrollState()
     val isApiError = uiState is AuthUiState.Error
+    val isOtpSent = uiState is AuthUiState.OtpSent || (uiState is AuthUiState.Error && uiState.isOtpError)
 
     fun shouldShowError(dirty: Boolean, valid: Boolean): Boolean {
         return (dirty || hasBeenSubmitted) && !valid
@@ -91,7 +94,7 @@ fun SignupScreen(
                 title = { Text("Sign Up") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -107,6 +110,7 @@ fun SignupScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding() // Add padding for the keyboard
                 .padding(horizontal = 24.dp)
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -253,6 +257,49 @@ fun SignupScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Customer Type Selection - Research Doc: Fewer than 5 options = SegmentedButton
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = "Customer Type",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF64B5F6),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                val customerTypes = listOf(
+                    1L to "Individual",
+                    2L to "Business",
+                    3L to "Special"
+                )
+
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    customerTypes.forEachIndexed { index, (id, label) ->
+                        SegmentedButton(
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = customerTypes.size),
+                            onClick = { customerTypeId = id },
+                            selected = customerTypeId == id,
+                            colors = SegmentedButtonDefaults.colors(
+                                activeContainerColor = Color(0xFF1E88E5),
+                                activeContentColor = Color.White,
+                                inactiveContainerColor = Color.Transparent,
+                                inactiveContentColor = Color.White.copy(alpha = 0.7f),
+                                activeBorderColor = Color(0xFF64B5F6),
+                                inactiveBorderColor = Color.White.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Text(label, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Password
             OutlinedTextField(
                 value = password,
@@ -331,8 +378,6 @@ fun SignupScreen(
                 supportingText = {
                     if (shouldShowError(confirmPasswordDirty, isConfirmPasswordValid)) {
                         Text(text = "Passwords do not match", color = Color.Red)
-                    } else if (isApiError) {
-                        Text(text = (uiState as AuthUiState.Error).message, color = Color.Red)
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -349,6 +394,43 @@ fun SignupScreen(
                 )
             )
 
+            if (isOtpSent) {
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = otp,
+                    onValueChange = { otp = it },
+                    label = { Text("Enter 6-digit OTP") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = uiState is AuthUiState.Error && uiState.isOtpError,
+                    supportingText = {
+                        if (uiState is AuthUiState.Error && uiState.isOtpError) {
+                            Text(text = uiState.message, color = Color.Red)
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        errorTextColor = Color.White,
+                        focusedLabelColor = Color(0xFF64B5F6),
+                        unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
+                        focusedBorderColor = Color(0xFF64B5F6),
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
+                        errorBorderColor = Color.Red,
+                        errorLabelColor = Color.Red
+                    )
+                )
+                if (uiState is AuthUiState.OtpSent) {
+                    Text(
+                        text = "A verification code has been sent to your email.",
+                        color = Color.Green,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
             // Sign Up Button
@@ -357,7 +439,11 @@ fun SignupScreen(
                     hasBeenSubmitted = true
                     if (isEmailValid && isFirstNameValid && isLastNameValid && 
                         isIdNumberValid && isPasswordValid && isConfirmPasswordValid) {
-                        viewModel.signup(email, password, firstName, lastName, idNumber, onBack)
+                        if (isOtpSent) {
+                            viewModel.signup(email, password, firstName, lastName, idNumber, customerTypeId, otp, onBack)
+                        } else {
+                            viewModel.sendOtp(email)
+                        }
                     }
                 },
                 modifier = Modifier
@@ -382,7 +468,11 @@ fun SignupScreen(
                     if (uiState is AuthUiState.Loading) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("SIGN UP", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isOtpSent) "VERIFY & SIGN UP" else "SEND OTP",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -391,3 +481,4 @@ fun SignupScreen(
         }
     }
 }
+

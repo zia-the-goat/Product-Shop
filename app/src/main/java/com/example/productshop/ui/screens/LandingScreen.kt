@@ -41,7 +41,9 @@ fun LandingScreen(onContinueAsGuest: () -> Unit, onLogin: () -> Unit, onSignUp: 
             Icon(
                 imageVector = Icons.Default.Fingerprint,
                 contentDescription = "Branding Icon",
-                modifier = Modifier.size(100.dp),
+                modifier = Modifier
+                    .size(100.dp)
+                    .semantics { contentDescription = "Security branding icon" },
                 tint = Color(0xFF64B5F6)
             )
 

@@ -7,7 +7,11 @@ import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+
 class SecurityManager(context: Context) {
+    private val gson = Gson()
 
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -50,5 +54,24 @@ class SecurityManager(context: Context) {
     
     fun hasStoredCredentials(): Boolean {
         return sharedPreferences.contains("email") && sharedPreferences.contains("password")
+    }
+
+    fun saveFaceEmbedding(embedding: FloatArray) {
+        val json = gson.toJson(embedding)
+        sharedPreferences.edit().putString("face_embedding", json).apply()
+    }
+
+    fun getFaceEmbedding(): FloatArray? {
+        val json = sharedPreferences.getString("face_embedding", null) ?: return null
+        val type = object : TypeToken<FloatArray>() {}.type
+        return gson.fromJson(json, type)
+    }
+
+    fun isFaceAuthSetup(): Boolean {
+        return sharedPreferences.contains("face_embedding")
+    }
+
+    fun clearFaceEmbedding() {
+        sharedPreferences.edit().remove("face_embedding").apply()
     }
 }

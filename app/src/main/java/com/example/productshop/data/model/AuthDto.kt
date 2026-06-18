@@ -8,6 +8,15 @@ data class SignupRequest(
     val idNumber: String? = null
 )
 
+data class CreateCustomerDto(
+    val username: String,
+    val password: String,
+    val firstName: String,
+    val lastName: String,
+    val idNumber: String,
+    val customerTypeId: Long
+)
+
 data class LoginResult(
     val success: String,
     val errorMessage: String? = null,

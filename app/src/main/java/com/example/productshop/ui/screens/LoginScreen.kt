@@ -5,7 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -46,11 +47,12 @@ fun LoginScreenPreview() {
 fun LoginScreen(
     viewModel: AuthViewModel,
     onBack: () -> Unit,
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onFaceLoginClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val executor = remember { ContextCompat.getMainExecutor(context) }
-    
+
     val biometricPrompt = remember {
         if (context is FragmentActivity) {
             BiometricPrompt(
@@ -103,7 +105,7 @@ fun LoginScreen(
                 title = { Text("Login") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -267,6 +269,23 @@ fun LoginScreen(
                         Icon(
                             imageVector = Icons.Default.Fingerprint,
                             contentDescription = "Biometric Login",
+                            tint = Color(0xFF64B5F6),
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+
+                if (viewModel.canUseFaceAuth()) {
+                    Spacer(modifier = Modifier.width(16.dp))
+                    IconButton(
+                        onClick = onFaceLoginClick,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(28.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Face,
+                            contentDescription = "Face Login",
                             tint = Color(0xFF64B5F6),
                             modifier = Modifier.size(32.dp)
                         )

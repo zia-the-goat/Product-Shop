@@ -39,10 +39,16 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.productshop.data.model.ProductDto
 import com.example.productshop.ui.components.ShimmerItem
+import com.example.productshop.ui.viewmodel.AuthViewModel
+import com.example.productshop.ui.viewmodel.KycViewModel
 import com.example.productshop.ui.viewmodel.ProductViewModel
+import com.example.productshop.ui.viewmodel.SubscriptionViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.animateColorAsState
@@ -51,7 +57,13 @@ import androidx.compose.animation.animateColorAsState
 @Composable
 fun DiscoverScreen(
     viewModel: ProductViewModel,
-    onProductClick: (Long) -> Unit
+    kycViewModel: KycViewModel,
+    authViewModel: AuthViewModel,
+    subscriptionViewModel: SubscriptionViewModel,
+    onProductClick: (Long) -> Unit,
+    onStartKyc: () -> Unit,
+    onSetupFace: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val products = viewModel.products
     
@@ -68,11 +80,12 @@ fun DiscoverScreen(
     }
     
     var selectedCategory by remember { mutableStateOf("All") }
+    var sortByPriceLowHigh by remember { mutableStateOf<Boolean?>(null) } // null = no sort, true = low-high, false = high-low
     var selectedTab by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
 
-    val filteredProducts = remember(selectedCategory, products) {
-        if (selectedCategory == "All") {
+    val filteredProducts = remember(selectedCategory, sortByPriceLowHigh, products) {
+        val filtered = if (selectedCategory == "All") {
             products
         } else {
             val searchTerm = selectedCategory.removeSuffix("s")
@@ -80,6 +93,12 @@ fun DiscoverScreen(
                 it.name.contains(searchTerm, ignoreCase = true) || 
                 it.description.contains(searchTerm, ignoreCase = true) 
             }
+        }
+
+        when (sortByPriceLowHigh) {
+            true -> filtered.sortedBy { it.price }
+            false -> filtered.sortedByDescending { it.price }
+            else -> filtered
         }
     }
 
@@ -118,7 +137,7 @@ fun DiscoverScreen(
 
                             Icon(
                                 imageVector = Icons.Default.Fingerprint,
-                                contentDescription = null,
+                                contentDescription = "App Logo",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(36.dp)
                             )
@@ -194,54 +213,117 @@ fun DiscoverScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            if (viewModel.isLoading) {
-                DiscoverLoadingState()
-            } else if (viewModel.errorMessage != null) {
-                DiscoverErrorState(viewModel.errorMessage!!, onRetry = { scope.launch { viewModel.fetchProducts() } })
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        DynamicHeroCarousel()
-                    }
-
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Discover",
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
-
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 16.dp)
+            when (selectedTab) {
+                0 -> {
+                    if (viewModel.isLoading) {
+                        DiscoverLoadingState()
+                    } else if (viewModel.errorMessage != null) {
+                        DiscoverErrorState(viewModel.errorMessage!!, onRetry = { scope.launch { viewModel.fetchProducts() } })
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            contentPadding = PaddingValues(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            items(categories) { category ->
-                                FilterChip(
-                                    selected = selectedCategory == category,
-                                    onClick = { selectedCategory = category },
-                                    label = { Text(category) },
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                DynamicHeroCarousel()
+                            }
+
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Discover",
+                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                                     )
-                                )
+
+                                    // Sorting Chips - Research Doc: Sorting near top
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        FilterChip(
+                                            selected = sortByPriceLowHigh == true,
+                                            onClick = {
+                                                sortByPriceLowHigh = if (sortByPriceLowHigh == true) null else true
+                                            },
+                                            label = { Text("Price ↓", fontSize = 12.sp) },
+                                            leadingIcon = if (sortByPriceLowHigh == true) {
+                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                            } else null,
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        )
+                                        FilterChip(
+                                            selected = sortByPriceLowHigh == false,
+                                            onClick = {
+                                                sortByPriceLowHigh = if (sortByPriceLowHigh == false) null else false
+                                            },
+                                            label = { Text("Price ↑", fontSize = 12.sp) },
+                                            leadingIcon = if (sortByPriceLowHigh == false) {
+                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                            } else null,
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                ) {
+                                    items(categories) { category ->
+                                        FilterChip(
+                                            selected = selectedCategory == category,
+                                            onClick = { selectedCategory = category },
+                                            label = { Text(category) },
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            items(filteredProducts) { product ->
+                                DiscoverProductItem(product) {
+                                    onProductClick(product.id)
+                                }
                             }
                         }
                     }
-
-                    items(filteredProducts) { product ->
-                        DiscoverProductItem(product) {
-                            onProductClick(product.id)
-                        }
+                }
+                1 -> {
+                    SubscriptionsScreen(
+                        viewModel = subscriptionViewModel,
+                        isGuest = authViewModel.isGuest,
+                        onLoginRequest = onLogout, // Reuse logout logic to return to landing
+                        onNavigateToDiscover = { selectedTab = 0 }
+                    )
+                }
+                3 -> {
+                    AccountScreen(
+                        viewModel = kycViewModel,
+                        authViewModel = authViewModel,
+                        onStartKyc = onStartKyc,
+                        onSetupFace = onSetupFace,
+                        onLogout = onLogout
+                    )
+                }
+                else -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = "Coming Soon", style = MaterialTheme.typography.titleLarge)
                     }
                 }
             }
@@ -293,7 +375,7 @@ fun DynamicHeroCarousel() {
             Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                 AsyncImage(
                     model = item.imageUrl,
-                    contentDescription = null,
+                    contentDescription = "Banner: ${item.title}",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().alpha(0.6f)
                 )
@@ -351,13 +433,14 @@ fun DiscoverProductItem(product: ProductDto, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .height(230.dp) // Set a fixed height for consistency
             .clickable(onClick = onClick)
     ) {
         Column {
-            Box(modifier = Modifier.height(140.dp).fillMaxWidth().background(Color.White)) {
+            Box(modifier = Modifier.height(130.dp).fillMaxWidth().background(Color.White)) {
                 AsyncImage(
                     model = if (product.imageUrl.contains("placeholder") || product.imageUrl.isEmpty()) placeholderImage else product.imageUrl,
-                    contentDescription = null,
+                    contentDescription = "Product Image: ${product.name}",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().padding(16.dp)
                 )
@@ -368,8 +451,10 @@ fun DiscoverProductItem(product: ProductDto, onClick: () -> Unit) {
                     text = product.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 2, // Allow 2 lines to show 'Commercial Short' and 'Long'
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 2,
+                    minLines = 2, // Ensure consistent height for text
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 20.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
