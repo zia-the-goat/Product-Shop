@@ -1,49 +1,18 @@
 /**
- * ProductShop Website - App Detection & Download Logic
+ * ProductShop Website - App Selection & Download Logic
  */
 
 const APP_SCHEME = "productshop://open";
 const APK_URL = "ProductShop.apk";
 const MODAL_ID = "warning-modal";
-const PACKAGE_NAME = "com.example.productshop";
 
 /**
- * Main entry point for the download button.
- * Uses only silent detection to avoid accidental app launches.
+ * Main entry point for the "Get the App" button.
+ * Always shows the modal to let the user choose their action.
  */
-async function handleDownloadClick() {
-    console.log("Download clicked, checking for installed app (silent check)...");
-
-    // Tier 1: Official navigator.getInstalledRelatedApps()
-    // This is the ONLY silent way to check. If it fails or isn't supported,
-    // we proceed to download rather than "testing" the URI scheme which causes the auto-open.
-    const isInstalledOfficial = await checkAppInstalledOfficial();
-
-    if (isInstalledOfficial) {
-        console.log("App detected via official API. Showing warning modal.");
-        showModal();
-    } else {
-        console.log("App not detected or API not supported. Proceeding to download.");
-        initiateDownload();
-    }
-}
-
-/**
- * Uses the official API to detect if the app is installed.
- * Requires Digital Asset Links (assetlinks.json) to be correctly configured.
- * This check is SILENT and does not trigger any app launch or browser prompts.
- */
-async function checkAppInstalledOfficial() {
-    if ('getInstalledRelatedApps' in navigator) {
-        try {
-            const relatedApps = await navigator.getInstalledRelatedApps();
-            return relatedApps.some(app => app.id === PACKAGE_NAME);
-        } catch (error) {
-            console.warn("getInstalledRelatedApps failed:", error);
-            return false;
-        }
-    }
-    return false;
+function handleDownloadClick() {
+    console.log("Get the App clicked. Showing options modal.");
+    showModal();
 }
 
 /**
@@ -61,33 +30,41 @@ function initiateDownload() {
 
 /**
  * Opens the app using its custom URI scheme.
- * This is ONLY called if the user explicitly clicks "Open App" in the modal.
+ * Only called if the user explicitly clicks "Open App" in the modal.
  */
 function openApp() {
-    console.log("User explicitly requested to open existing app.");
+    console.log("User requested to open existing app.");
     closeModal();
     window.location.href = APP_SCHEME;
+
+    // Optional: Fallback if app doesn't open after a delay
+    setTimeout(() => {
+        if (document.hasFocus()) {
+            console.log("App likely not installed, offering download.");
+            // We could show a toast or message here if needed.
+        }
+    }, 2500);
 }
 
 /**
- * Shows the warning modal.
+ * Shows the action modal.
  */
 function showModal() {
     document.getElementById(MODAL_ID).classList.add('active');
 }
 
 /**
- * Closes the warning modal.
+ * Closes the modal.
  */
 function closeModal() {
     document.getElementById(MODAL_ID).classList.remove('active');
 }
 
 /**
- * Proceeds with download from the modal.
+ * User chose to download the APK from the modal.
  */
 function proceedWithDownload() {
-    console.log("User chose to download anyway.");
+    console.log("User chose to download APK.");
     closeModal();
     initiateDownload();
 }

@@ -188,8 +188,16 @@ body {
 
 .modal-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+    flex-direction: column; /* Stacked for easier mobile tapping */
+    gap: 12px;
+}
+
+@media (min-width: 400px) {
+    .modal-actions {
+        flex-direction: row;
+        justify-content: flex-end;
+        gap: 8px;
+    }
 }
 
 /* Screenshot Grid */
