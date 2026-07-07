@@ -11,64 +11,50 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.productshop.ui.screens.DiscoverScreen
-import com.example.productshop.ui.screens.LandingScreen
-import com.example.productshop.ui.screens.LoginScreen
-import com.example.productshop.ui.screens.SignupScreen
-import com.example.productshop.ui.screens.ProductDetailScreen
-import com.example.productshop.ui.screens.SplashScreen
-import com.example.productshop.ui.screens.AccountScreen
-import com.example.productshop.ui.screens.FaceSetupScreen
-import com.example.productshop.ui.screens.FaceLoginScreen
-import com.example.productshop.ui.screens.KycScreen
-import com.example.productshop.ui.screens.SubscriptionsScreen
+import androidx.navigation.compose.rememberNavController
+import com.example.productshop.ui.navigation.ProductNavHost
 import com.example.productshop.security.SessionManager
+import com.example.productshop.util.AnalyticsManager
 import com.example.productshop.ui.viewmodel.AuthViewModel
 import com.example.productshop.ui.viewmodel.KycViewModel
 import com.example.productshop.ui.viewmodel.ProductViewModel
 import com.example.productshop.ui.viewmodel.SubscriptionViewModel
+import com.example.productshop.ui.viewmodel.SettingsViewModel
+import com.example.productshop.ui.theme.ProductShopTheme
 
-private val AppBlueTheme = lightColorScheme(
-    primary = Color(0xFF1976D2),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFBBDEFB),
-    onPrimaryContainer = Color(0xFF0D47A1),
-    secondary = Color(0xFF42A5F5),
-    onSecondary = Color.White,
-    background = Color(0xFFF5F9FF),
-    surface = Color.White,
-    onSurface = Color(0xFF1A1C1E),
-    surfaceVariant = Color(0xFFE1E2EC),
-    onSurfaceVariant = Color(0xFF44474E),
-    error = Color(0xFFBA1A1A)
-)
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Handle navigation bar visibility
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        
+        // Note: In a real app, we might want to check for gesture navigation.
+        // For this requirement, we hide the nav bar if it's the "normal" one.
+        // We'll use a listener to hide it when it appears if we are in immersive mode.
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.navigationBars())
+
         setContent {
-            MaterialTheme(colorScheme = AppBlueTheme) {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            ProductShopTheme(
+                themeMode = settingsViewModel.themeMode,
+                brandTheme = settingsViewModel.brandTheme
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    ProductApp()
+                    ProductApp(settingsViewModel = settingsViewModel)
                 }
             }
         }
     }
-}
-
-enum class Screen {
-    Splash,
-    Landing,
-    Login,
-    Signup,
-    Discover,
-    Detail,
-    Kyc,
-    FaceSetup,
-    FaceLogin
 }
 
 @Composable
@@ -76,106 +62,19 @@ fun ProductApp(
     viewModel: ProductViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel(),
     kycViewModel: KycViewModel = viewModel(),
-    subscriptionViewModel: SubscriptionViewModel = viewModel()
+    subscriptionViewModel: SubscriptionViewModel = viewModel(),
+    notificationViewModel: com.example.productshop.ui.viewmodel.NotificationViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel
 ) {
-    var currentScreen by remember { mutableStateOf(Screen.Splash) }
-    var selectedProductId by remember { mutableStateOf<Long?>(null) }
+    val navController = rememberNavController()
 
-    when (currentScreen) {
-        Screen.Splash -> {
-            SplashScreen(onSplashFinished = {
-                currentScreen = Screen.Landing
-            })
-        }
-        Screen.Landing -> {
-            LandingScreen(
-                onContinueAsGuest = {
-                    authViewModel.clearData()
-                    kycViewModel.clearData()
-                    subscriptionViewModel.clearData()
-                    authViewModel.setGuestMode(true)
-                    currentScreen = Screen.Discover
-                },
-                onLogin = {
-                    authViewModel.resetState()
-                    currentScreen = Screen.Login
-                },
-                onSignUp = {
-                    authViewModel.resetState()
-                    currentScreen = Screen.Signup
-                }
-            )
-        }
-        Screen.Login -> {
-            LoginScreen(
-                viewModel = authViewModel,
-                onBack = { currentScreen = Screen.Landing },
-                onLoginSuccess = { currentScreen = Screen.Discover },
-                onFaceLoginClick = { currentScreen = Screen.FaceLogin }
-            )
-        }
-        Screen.Signup -> {
-            SignupScreen(
-                viewModel = authViewModel,
-                onBack = { currentScreen = Screen.Landing }
-            )
-        }
-        Screen.Discover -> {
-            DiscoverScreen(
-                viewModel = viewModel,
-                kycViewModel = kycViewModel,
-                authViewModel = authViewModel,
-                subscriptionViewModel = subscriptionViewModel,
-                onProductClick = { id ->
-                    selectedProductId = id
-                    currentScreen = Screen.Detail
-                },
-                onStartKyc = {
-                    currentScreen = Screen.Kyc
-                },
-                onSetupFace = {
-                    currentScreen = Screen.FaceSetup
-                },
-                onLogout = {
-                    SessionManager.clearSession()
-                    authViewModel.clearData()
-                    kycViewModel.clearData()
-                    subscriptionViewModel.clearData()
-                    currentScreen = Screen.Landing
-                }
-            )
-        }
-        Screen.Detail -> {
-            selectedProductId?.let { id ->
-                ProductDetailScreen(
-                    productId = id,
-                    viewModel = viewModel,
-                    onBack = {
-                        currentScreen = Screen.Discover
-                        selectedProductId = null
-                    }
-                )
-            }
-        }
-        Screen.Kyc -> {
-            KycScreen(
-                viewModel = kycViewModel,
-                onBack = { currentScreen = Screen.Discover }
-            )
-        }
-        Screen.FaceSetup -> {
-            FaceSetupScreen(
-                viewModel = authViewModel,
-                onBack = { currentScreen = Screen.Discover },
-                onSetupComplete = { currentScreen = Screen.Discover }
-            )
-        }
-        Screen.FaceLogin -> {
-            FaceLoginScreen(
-                viewModel = authViewModel,
-                onBack = { currentScreen = Screen.Login },
-                onLoginSuccess = { currentScreen = Screen.Discover }
-            )
-        }
-    }
+    ProductNavHost(
+        navController = navController,
+        productViewModel = viewModel,
+        authViewModel = authViewModel,
+        kycViewModel = kycViewModel,
+        subscriptionViewModel = subscriptionViewModel,
+        notificationViewModel = notificationViewModel,
+        settingsViewModel = settingsViewModel
+    )
 }

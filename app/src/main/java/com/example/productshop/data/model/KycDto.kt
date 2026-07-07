@@ -20,7 +20,8 @@ data class CreateDocumentResponse(
 
 data class SubscriptionDto(
     val subscriptionId: Long,
-    val product: List<ProductDto>
+    val product: List<ProductDto>,
+    val dateSubscribed: String? = "2024-06-25" // Default placeholder
 )
 
 data class SubscriptionsDto(

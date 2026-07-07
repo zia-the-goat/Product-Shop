@@ -1,8 +1,10 @@
 package com.example.productshop.ui.screens
 
+import android.Manifest
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,11 +13,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,21 +33,29 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.productshop.ui.viewmodel.KycUiState
 import com.example.productshop.ui.viewmodel.KycViewModel
+import com.example.productshop.util.AnalyticsManager
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KycScreen(
     viewModel: KycViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onHome: () -> Unit
 ) {
     val context = LocalContext.current
     val uiState = viewModel.uiState
     var showSuccessDialog by remember { mutableStateOf(false) }
+
+    // Fetch profile and KYC status when screen opens
+    LaunchedEffect(Unit) {
+        viewModel.fetchProfileAndKyc()
+    }
 
     LaunchedEffect(uiState) {
         if (uiState is KycUiState.Success) {
@@ -80,6 +92,11 @@ fun KycScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    IconButton(onClick = onHome) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Home, contentDescription = "Home")
+                    }
                 }
             )
         }
@@ -92,29 +109,85 @@ fun KycScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Secure your account by uploading the following documents.",
+                text = if (viewModel.kycStatus?.primaryIndicator == true) 
+                    "Your identity has been verified. You have full access to all products."
+                    else "Secure your account by uploading the following documents.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (viewModel.kycStatus?.primaryIndicator == true) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (viewModel.kycStatus?.primaryIndicator == true) FontWeight.Bold else FontWeight.Normal
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            DocumentCaptureCard(
-                label = "Selfie",
-                description = "Clear photo of your face",
-                uri = viewModel.selfieUri,
-                onCapture = { uri -> viewModel.selfieUri = uri }
-            )
+            if (viewModel.kycStatus?.primaryIndicator == true) {
+                // Polished Verified UI
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    shape = RoundedCornerShape(32.dp),
+                    color = Color(0xFFE8F5E9).copy(alpha = 0.5f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E7D32).copy(alpha = 0.2f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(96.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF2E7D32),
+                            tonalElevation = 4.dp,
+                            shadowElevation = 8.dp
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Verified",
+                                tint = Color.White,
+                                modifier = Modifier.size(64.dp).padding(16.dp)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Text(
+                            text = "Identity Verified",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF1B5E20)
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = "Your account is fully compliant",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF2E7D32).copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                DocumentCaptureCard(
+                    label = "Selfie",
+                    description = "Clear photo of your face",
+                    uri = viewModel.selfieUri,
+                    onCapture = { uri -> viewModel.selfieUri = uri }
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            DocumentCaptureCard(
-                label = "Proof of Residence",
-                description = "Utility bill or bank statement",
-                uri = viewModel.residenceUri,
-                onCapture = { uri -> viewModel.residenceUri = uri }
-            )
+                DocumentCaptureCard(
+                    label = "Proof of Residence",
+                    description = "Utility bill or bank statement",
+                    uri = viewModel.residenceUri,
+                    onCapture = { uri -> viewModel.residenceUri = uri }
+                )
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -127,34 +200,37 @@ fun KycScreen(
                 )
             }
 
-            Button(
-                onClick = { viewModel.uploadKyc(context) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = viewModel.selfieUri != null && viewModel.residenceUri != null && uiState !is KycUiState.Loading && uiState !is KycUiState.Verifying,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                if (uiState is KycUiState.Loading) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Uploading Documents...")
+            // Button only visible if NOT verified
+            if (viewModel.kycStatus?.primaryIndicator != true) {
+                Button(
+                    onClick = { viewModel.uploadKyc(context) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = viewModel.selfieUri != null && viewModel.residenceUri != null && uiState !is KycUiState.Loading && uiState !is KycUiState.Verifying,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (uiState is KycUiState.Loading) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Uploading Documents...")
+                        }
+                    } else if (uiState is KycUiState.Verifying) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Checking Compliance...")
+                        }
+                    } else if (uiState is KycUiState.Success) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "Success", tint = Color.White)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Verification Complete!")
+                        }
+                    } else {
+                        Icon(Icons.Default.FileUpload, contentDescription = "Upload Icon")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Submit Verification")
                     }
-                } else if (uiState is KycUiState.Verifying) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Checking Compliance...")
-                    }
-                } else if (uiState is KycUiState.Success) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "Success", tint = Color.White)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Verification Complete!")
-                    }
-                } else {
-                    Icon(Icons.Default.FileUpload, contentDescription = "Upload Icon")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Submit Verification")
                 }
             }
         }
@@ -170,6 +246,7 @@ fun DocumentCaptureCard(
 ) {
     val context = LocalContext.current
     var tempUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var showOptions by remember { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = object : ActivityResultContracts.TakePicture() {
@@ -182,10 +259,70 @@ fun DocumentCaptureCard(
         },
         onResult = { success ->
             if (success) {
-                tempUri?.let { onCapture(it) }
+                tempUri?.let { 
+                    onCapture(it)
+                    AnalyticsManager.logSelectContent("document_capture", label)
+                }
             }
         }
     )
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { 
+            onCapture(it)
+            AnalyticsManager.logSelectContent("document_gallery", label)
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val file = File(context.externalCacheDir, "${label.replace(" ", "_").lowercase()}_${System.currentTimeMillis()}.png")
+            val newUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            tempUri = newUri
+            cameraLauncher.launch(newUri)
+        } else {
+            Log.e("KycScreen", "Camera permission denied")
+        }
+    }
+
+    if (showOptions) {
+        AlertDialog(
+            onDismissRequest = { showOptions = false },
+            title = { Text("Select Document Source") },
+            text = { Text("How would you like to upload your $label?") },
+            confirmButton = {
+                TextButton(onClick = { 
+                    showOptions = false
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        val file = File(context.externalCacheDir, "${label.replace(" ", "_").lowercase()}_${System.currentTimeMillis()}.png")
+                        val newUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        tempUri = newUri
+                        cameraLauncher.launch(newUri)
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                }) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Camera")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    showOptions = false
+                    galleryLauncher.launch("image/*")
+                }) {
+                    Icon(Icons.Default.FileUpload, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Gallery")
+                }
+            }
+        )
+    }
 
     Column {
         Text(text = label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -200,10 +337,7 @@ fun DocumentCaptureCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 .border(1.dp, Color.LightGray, RoundedCornerShape(16.dp))
                 .clickable {
-                    val file = File(context.externalCacheDir, "${label.replace(" ", "_").lowercase()}_${System.currentTimeMillis()}.png")
-                    val newUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                    tempUri = newUri
-                    cameraLauncher.launch(newUri)
+                    showOptions = true
                 },
             contentAlignment = Alignment.Center
         ) {

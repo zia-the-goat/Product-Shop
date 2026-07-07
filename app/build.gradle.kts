@@ -1,7 +1,10 @@
+import com.android.ddmlib.Log
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -20,10 +23,33 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // buildConfigField("String", "SYSTEM_PASSWORD", "\"Admin@System2024\"")
         ndk {
             // No physical Android device is x86_64; this only affects emulators
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            versionNameSuffix = "-dev"
+            buildConfigField("String", "BASE_URL", "\"https://boozy-supply-ripping.ngrok-free.dev/\"")
+        }
+        create("qa") {
+            dimension = "environment"
+            versionNameSuffix = "-qa"
+            buildConfigField("String", "BASE_URL", "\"https://qa.insuretechguard.com/\"")
+        }
+        create("prod") {
+            dimension = "environment"
+            buildConfigField("String", "BASE_URL", "\"https://api.insuretechguard.com/\"")
+        }
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     buildTypes {
@@ -36,9 +62,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         jniLibs {
@@ -49,25 +77,6 @@ android {
             excludes += "META-INF/NOTICE.md"
             excludes += "META-INF/LICENSE.md"
         }
-    }
-}
-
-configurations.all {
-    exclude(group = "org.tensorflow", module = "tensorflow-lite-api")
-    exclude(group = "org.tensorflow", module = "tensorflow-lite-support-api")
-    resolutionStrategy {
-        // libdatastore_shared_counter.so
-        force("androidx.datastore:datastore-core:1.1.1")
-
-        // libandroidx.graphics.path.so
-        force("androidx.graphics:graphics-path:1.0.1")
-
-        // libsurface_util_jni.so — all CameraX modules must move together
-        force("androidx.camera:camera-core:1.4.1")
-        force("androidx.camera:camera-camera2:1.4.1")
-        force("androidx.camera:camera-lifecycle:1.4.1")
-        force("androidx.camera:camera-view:1.4.1")
-        force("androidx.camera:camera-mlkit-vision:1.4.1")
     }
 }
 
@@ -83,6 +92,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
     implementation(libs.coil.compose)
@@ -92,21 +102,12 @@ dependencies {
     implementation(libs.javax.activation)
     implementation(platform("com.google.firebase:firebase-bom:34.14.0"))
     implementation("com.google.firebase:firebase-analytics")
-
-    // CameraX
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-    implementation(libs.androidx.camera.mlkit.vision)
-
-    // ML Kit
-    implementation("com.google.mlkit:face-detection:16.1.7")
-
-    // TensorFlow Lite
-    implementation("org.tensorflow:tensorflow-lite:2.17.0")
+    implementation(libs.firebase.crashlytics)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

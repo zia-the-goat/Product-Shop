@@ -46,9 +46,9 @@ fun LoginScreenPreview() {
 @Composable
 fun LoginScreen(
     viewModel: AuthViewModel,
+    settingsViewModel: com.example.productshop.ui.viewmodel.SettingsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onBack: () -> Unit,
-    onLoginSuccess: () -> Unit,
-    onFaceLoginClick: () -> Unit = {}
+    onLoginSuccess: () -> Unit
 ) {
     val context = LocalContext.current
     val executor = remember { ContextCompat.getMainExecutor(context) }
@@ -102,14 +102,14 @@ fun LoginScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Login") },
+                title = { Text("Login", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF1A1C2E),
+                    containerColor = Color.Transparent,
                     titleContentColor = Color.White,
                     navigationIconContentColor = Color.White
                 )
@@ -117,25 +117,36 @@ fun LoginScreen(
         },
         containerColor = Color(0xFF1A1C2E)
     ) { padding ->
+        if (uiState is AuthUiState.Loading) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(padding)
+                    .height(2.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = Color.Transparent
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
+            Spacer(modifier = Modifier.height(32.dp))
             // Header - Research Doc: Focus on value proposition/branding
             Text(
                 text = "Welcome Back",
-                fontSize = 28.sp,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Sign in to continue your journey",
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.7f)
             )
 
@@ -156,20 +167,22 @@ fun LoginScreen(
                 isError = isUsernameError(),
                 supportingText = {
                     if (isUsernameError()) {
-                        Text("Username is required", color = Color.Red)
+                        Text("Username is required", style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
                     errorTextColor = Color.White,
-                    focusedLabelColor = Color(0xFF64B5F6),
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
                     unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                    focusedBorderColor = Color(0xFF64B5F6),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                    errorBorderColor = Color.Red,
-                    errorLabelColor = Color.Red
+                    errorBorderColor = MaterialTheme.colorScheme.error,
+                    errorLabelColor = MaterialTheme.colorScheme.error,
+                    errorSupportingTextColor = MaterialTheme.colorScheme.error
                 )
             )
 
@@ -191,7 +204,7 @@ fun LoginScreen(
                 supportingText = {
                     if (isPasswordError()) {
                         val message = if (password.isEmpty()) "Password is required" else (uiState as AuthUiState.Error).message
-                        Text(text = message, color = Color.Red)
+                        Text(text = message, style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -204,16 +217,18 @@ fun LoginScreen(
                         )
                     }
                 },
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
                     errorTextColor = Color.White,
-                    focusedLabelColor = Color(0xFF64B5F6),
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
                     unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                    focusedBorderColor = Color(0xFF64B5F6),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                    errorBorderColor = Color.Red,
-                    errorLabelColor = Color.Red
+                    errorBorderColor = MaterialTheme.colorScheme.error,
+                    errorLabelColor = MaterialTheme.colorScheme.error,
+                    errorSupportingTextColor = MaterialTheme.colorScheme.error
                 )
             )
 
@@ -234,59 +249,32 @@ fun LoginScreen(
                     modifier = Modifier
                         .weight(1f)
                         .height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                    contentPadding = PaddingValues(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    ),
                     enabled = uiState !is AuthUiState.Loading
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(Color(0xFF1E88E5), Color(0xFF64B5F6))
-                                ),
-                                shape = RoundedCornerShape(28.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (uiState is AuthUiState.Loading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                        } else {
-                            Text("LOGIN", color = Color.White, fontWeight = FontWeight.Bold)
-                        }
+                    if (uiState is AuthUiState.Loading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("LOGIN", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
 
-                if (viewModel.canUseBiometric()) {
+                if (viewModel.canUseBiometric() && settingsViewModel.biometricEnabled) {
                     Spacer(modifier = Modifier.width(16.dp))
                     IconButton(
                         onClick = { biometricPrompt?.authenticate(promptInfo) },
                         modifier = Modifier
                             .size(56.dp)
-                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(28.dp))
+                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                     ) {
                         Icon(
                             imageVector = Icons.Default.Fingerprint,
                             contentDescription = "Biometric Login",
-                            tint = Color(0xFF64B5F6),
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
-
-                if (viewModel.canUseFaceAuth()) {
-                    Spacer(modifier = Modifier.width(16.dp))
-                    IconButton(
-                        onClick = onFaceLoginClick,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(28.dp))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Face,
-                            contentDescription = "Face Login",
-                            tint = Color(0xFF64B5F6),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(32.dp)
                         )
                     }

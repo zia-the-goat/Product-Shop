@@ -39,6 +39,8 @@ import kotlin.random.Random
 fun SplashScreen(onSplashFinished: () -> Unit) {
     // 11. Performance: Perceived Performance via smooth animations
     var isHolding by remember { mutableStateOf(false) }
+    var hasFinished by remember { mutableStateOf(false) }
+
     val holdProgress = animateFloatAsState(
         targetValue = if (isHolding) 1f else 0f,
         animationSpec = tween(durationMillis = 1500, easing = LinearEasing),
@@ -46,7 +48,8 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     )
 
     LaunchedEffect(holdProgress.value) {
-        if (holdProgress.value >= 0.5f) {
+        if (holdProgress.value >= 0.5f && !hasFinished) {
+            hasFinished = true
             onSplashFinished()
         }
     }

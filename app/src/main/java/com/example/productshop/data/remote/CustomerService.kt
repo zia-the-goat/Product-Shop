@@ -10,4 +10,11 @@ interface CustomerService {
 
     @GET("v1/customer")
     suspend fun getCustomerByEmail(@Query("emailAddress") email: String, @Header("Authorization") authHeader: String): CustomerDto
+
+    @POST("v1/customer/{customerId}/accounts/{accountTypeId}")
+    suspend fun addAccountToCustomer(
+        @Path("customerId") customerId: Long,
+        @Path("accountTypeId") accountTypeId: Long,
+        @Header("Authorization") authHeader: String
+    )
 }

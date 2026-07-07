@@ -24,101 +24,118 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun LandingScreen(onContinueAsGuest: () -> Unit, onLogin: () -> Unit, onSignUp: () -> Unit) {
-    // 12. Trust & Security: Login/Security focused screen
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1C2E)) // Consistent dark blue
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF1A1C2E), Color(0xFF121320))
+                )
+            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp), // 13. Visual Design: 8dp grid (32dp)
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Icon with branding
-            Icon(
-                imageVector = Icons.Default.Fingerprint,
-                contentDescription = "Branding Icon",
-                modifier = Modifier
-                    .size(100.dp)
-                    .semantics { contentDescription = "Security branding icon" },
-                tint = Color(0xFF64B5F6)
-            )
+            Spacer(modifier = Modifier.height(32.dp))
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Brand Text
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Light, color = Color.White)) {
-                        append("InsureTech")
-                    }
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) {
-                        append("Guard")
-                    }
-                },
-                fontSize = 32.sp,
-                letterSpacing = 1.sp,
-                modifier = Modifier.semantics { contentDescription = "Application Name" }
-            )
-
-            Spacer(modifier = Modifier.height(140.dp))
-
-            // Login Button (Gradient) - 3. User Input (Touch Target)
-            Button(
-                onClick = { /* Security logic */ },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .semantics { contentDescription = "Primary Login button" },
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues()
+            // Icon and branding header grouped together
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
+                Icon(
+                    imageVector = Icons.Default.Fingerprint,
+                    contentDescription = "Branding Icon",
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color(0xFF1E88E5), Color(0xFF64B5F6))
-                            )
-                        )
-                        .clickable{onLogin()},
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Login", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                }
-            }
+                        .size(112.dp)
+                        .semantics { contentDescription = "Security branding icon" },
+                    tint = MaterialTheme.colorScheme.primary
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Sign Up link
-            Row {
-                Text("Don't have an account? ", color = Color.White.copy(alpha = 0.7f))
+                // Brand Text
                 Text(
-                    "Sign up",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier
-                        .clickable { onSignUp() }
-                        .semantics { contentDescription = "Sign up link" }
+                    text = buildAnnotatedString {
+                        withStyle(style = SpanStyle(fontWeight = FontWeight.ExtraLight, color = Color.White)) {
+                            append("InsureTech")
+                        }
+                        withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) {
+                            append("Guard")
+                        }
+                    },
+                    style = MaterialTheme.typography.headlineLarge,
+                    letterSpacing = 1.5.sp,
+                    modifier = Modifier.semantics { contentDescription = "Application Name" }
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Your Secure Insurance Companion",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.6f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            // Bottom section actions
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Login Button
+                Button(
+                    onClick = onLogin,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .semantics { contentDescription = "Primary Login button" },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Login", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                }
 
-            // Continue as Guest - 11. Performance (Low friction entry)
-            Text(
-                text = "Continue as guest",
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = 16.sp,
-                modifier = Modifier
-                    .clickable { onContinueAsGuest() }
-                    .semantics { contentDescription = "Continue as guest button" }
-            )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Sign Up link
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Don't have an account? ", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f))
+                    Text(
+                        "Sign up",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            textDecoration = TextDecoration.Underline,
+                            color = MaterialTheme.colorScheme.secondary
+                        ),
+                        modifier = Modifier
+                            .clickable { onSignUp() }
+                            .semantics { contentDescription = "Sign up link" }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(40.dp))
+
+                // Continue as Guest
+                TextButton(
+                    onClick = onContinueAsGuest,
+                    modifier = Modifier.semantics { contentDescription = "Continue as guest button" }
+                ) {
+                    Text(
+                        text = "Continue as guest",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }

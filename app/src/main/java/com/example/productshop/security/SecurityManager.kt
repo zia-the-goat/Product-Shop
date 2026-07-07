@@ -7,17 +7,20 @@ import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-
 class SecurityManager(context: Context) {
-    private val gson = Gson()
 
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val sharedPreferences = EncryptedSharedPreferences.create(
+    private val sharedPreferences = try {
+        createSharedPreferences(context)
+    } catch (e: Exception) {
+        context.deleteSharedPreferences("secure_prefs")
+        createSharedPreferences(context)
+    }
+
+    private fun createSharedPreferences(context: Context) = EncryptedSharedPreferences.create(
         context,
         "secure_prefs",
         masterKey,
@@ -33,6 +36,22 @@ class SecurityManager(context: Context) {
         }
     }
 
+    fun saveActiveAccountTypeId(id: Long) {
+        sharedPreferences.edit().putLong("active_account_type_id", id).apply()
+    }
+
+    fun getActiveAccountTypeId(): Long {
+        return sharedPreferences.getLong("active_account_type_id", -1L)
+    }
+
+    fun saveSystemPassword(password: String) {
+        sharedPreferences.edit().putString("system_password", password).apply()
+    }
+
+    fun getSystemPassword(): String? {
+        return sharedPreferences.getString("system_password", null)
+    }
+
     fun getCredentials(): Pair<String?, String?> {
         val email = sharedPreferences.getString("email", null)
         val password = sharedPreferences.getString("password", null)
@@ -43,6 +62,7 @@ class SecurityManager(context: Context) {
         sharedPreferences.edit().apply {
             remove("email")
             remove("password")
+            remove("active_account_type_id")
             apply()
         }
     }
@@ -54,24 +74,5 @@ class SecurityManager(context: Context) {
     
     fun hasStoredCredentials(): Boolean {
         return sharedPreferences.contains("email") && sharedPreferences.contains("password")
-    }
-
-    fun saveFaceEmbedding(embedding: FloatArray) {
-        val json = gson.toJson(embedding)
-        sharedPreferences.edit().putString("face_embedding", json).apply()
-    }
-
-    fun getFaceEmbedding(): FloatArray? {
-        val json = sharedPreferences.getString("face_embedding", null) ?: return null
-        val type = object : TypeToken<FloatArray>() {}.type
-        return gson.fromJson(json, type)
-    }
-
-    fun isFaceAuthSetup(): Boolean {
-        return sharedPreferences.contains("face_embedding")
-    }
-
-    fun clearFaceEmbedding() {
-        sharedPreferences.edit().remove("face_embedding").apply()
     }
 }

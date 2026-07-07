@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,20 +28,160 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.productshop.data.model.ProductDto
 import com.example.productshop.ui.viewmodel.ProductViewModel
+import com.example.productshop.util.AnalyticsManager
+import com.example.productshop.ui.viewmodel.AuthViewModel
+import com.example.productshop.ui.viewmodel.KycViewModel
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.productshop.ui.viewmodel.KycUiState
+
+@Preview(showBackground = true)
+@Composable
+fun ProductDetailScreenPreview() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val app = context.applicationContext as android.app.Application
+    val productViewModel = ProductViewModel(app)
+    val authViewModel = AuthViewModel(app)
+    val kycViewModel = KycViewModel(app)
+    val sampleProduct = ProductDto(1, "Life Insurance Plus", "Full coverage for your family", 299.0, "")
+    productViewModel.products = listOf(sampleProduct)
+    
+    MaterialTheme {
+        ProductDetailScreen(
+            productId = 1,
+            viewModel = productViewModel,
+            authViewModel = authViewModel,
+            kycViewModel = kycViewModel,
+            notificationViewModel = com.example.productshop.ui.viewmodel.NotificationViewModel(),
+            onBack = {},
+            onHome = {},
+            onApply = {},
+            onProductClick = {},
+            onLoginRedirect = {},
+            onKycRedirect = {}
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductDetailScreen(
     productId: Long,
     viewModel: ProductViewModel,
-    onBack: () -> Unit
+    authViewModel: AuthViewModel,
+    kycViewModel: KycViewModel,
+    notificationViewModel: com.example.productshop.ui.viewmodel.NotificationViewModel,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onApply: () -> Unit,
+    onProductClick: (Long) -> Unit,
+    onLoginRedirect: () -> Unit,
+    onKycRedirect: () -> Unit
 ) {
     val product = viewModel.products.find { it.id == productId }
+    val isKycLoading = kycViewModel.uiState is KycUiState.Loading
+    val isKycVerified = kycViewModel.kycStatus?.primaryIndicator == true
+    
+    var showGuestDialog by remember { mutableStateOf(false) }
+    var showKycDialog by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
+
+    if (showGuestDialog) {
+        AlertDialog(
+            onDismissRequest = { showGuestDialog = false },
+            title = { Text("Login Required") },
+            text = { Text("Guest users cannot apply for products. Please log in or sign up to continue.") },
+            confirmButton = {
+                Button(onClick = {
+                    showGuestDialog = false
+                    onLoginRedirect()
+                }) {
+                    Text("Log In")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGuestDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showKycDialog) {
+        AlertDialog(
+            onDismissRequest = { showKycDialog = false },
+            title = { Text("Identity Verification Required") },
+            text = { Text("To apply for this product, we need to verify your identity. It only takes a few minutes.") },
+            confirmButton = {
+                Button(onClick = {
+                    showKycDialog = false
+                    onKycRedirect()
+                }) {
+                    Text("Start Verification")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showKycDialog = false }) {
+                    Text("Later")
+                }
+            }
+        )
+    }
+
+    if (showShareDialog) {
+        AlertDialog(
+            onDismissRequest = { showShareDialog = false },
+            title = { Text("Share Product") },
+            text = {
+                val uriHandler = LocalUriHandler.current
+                val annotatedString = buildAnnotatedString {
+                    append("Click the link to open the app: ")
+                    pushStringAnnotation(tag = "URL", annotation = "productshop://open")
+                    withStyle(style = SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline)
+                    ) {
+                        append("productshop://open")
+                    }
+                    pop()
+                }
+                ClickableText(
+                    text = annotatedString,
+                    onClick = { offset ->
+                        annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                            .firstOrNull()?.let { annotation ->
+                                uriHandler.openUri(annotation.item)
+                            }
+                    },
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showShareDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+    
+    LaunchedEffect(product) {
+        product?.let {
+            AnalyticsManager.logSelectContent("product_view", it.id.toString())
+        }
+        if (!authViewModel.isGuest) {
+            kycViewModel.fetchProfileAndKyc()
+        }
+    }
+    
     var isExpanded by remember { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -50,63 +192,31 @@ fun ProductDetailScreen(
         return
     }
 
-    val productType = when {
-        product.name.contains("Investment", ignoreCase = true) ||
-                product.name.contains("VIP", ignoreCase = true) ||
-                product.name.contains("Islamic", ignoreCase = true) ||
-                product.name.contains("Short-Term", ignoreCase = true) ->
-            ProductType.INVESTMENT
+    val productType = remember(product) { ProductType.fromProduct(product) }
 
-        product.name.contains("Insurance", ignoreCase = true) ||
-                product.name.contains("Commercial", ignoreCase = true) ->
-            ProductType.INSURANCE
-
-        else ->
-            ProductType.CONTRACT
-    }
-
-    val relatedProducts = run {
-        fun getType(product: ProductDto): ProductType {
-            return when {
-                product.name.contains("Investment", ignoreCase = true) ||
-                        product.name.contains("VIP", ignoreCase = true) ||
-                        product.name.contains("Islamic", ignoreCase = true) ||
-                        product.name.contains("Short-Term", ignoreCase = true) ->
-                    ProductType.INVESTMENT
-
-                product.name.contains("Insurance", ignoreCase = true) ||
-                        product.name.contains("Commercial", ignoreCase = true) ->
-                    ProductType.INSURANCE
-
-                else ->
-                    ProductType.CONTRACT
-            }
-        }
-
-        val sameTypeProducts = viewModel.products
-            .filter {
-                it.id != productId &&
-                        getType(it) == productType
-            }
-
-        val otherProducts = viewModel.products
-            .filter {
-                it.id != productId &&
-                        getType(it) != productType
-            }
-
-        (sameTypeProducts + otherProducts)
+    val relatedProducts = remember(product) {
+        viewModel.products
+            .filter { it.id != productId && ProductType.fromProduct(it) == productType }
             .distinctBy { it.id }
-            .take(3)
+            .take(5)
     }
 
-    val benefits = getBenefitsForProduct(product, productType)
-    val requirements = getRequirementsForProduct(product, productType)
+    val exploreMoreProducts = remember(product) {
+        viewModel.products
+            .filter { it.id != productId && ProductType.fromProduct(it) != productType }
+            .distinctBy { it.id }
+            .take(5)
+    }
 
-    val fallbackImage = when {
-        product.name.contains("Insurance", ignoreCase = true) -> "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800"
-        product.name.contains("Investment", ignoreCase = true) -> "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800"
-        else -> "https://images.unsplash.com/photo-1556742044-3c52d6e88c62?w=800"
+    val benefits = remember(product) { getBenefitsForProduct(product, productType) }
+    val requirements = remember(product) { getRequirementsForProduct(product, productType) }
+
+    val fallbackImage = remember(product) {
+        when {
+            product.name.contains("Insurance", ignoreCase = true) -> "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800"
+            product.name.contains("Investment", ignoreCase = true) -> "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800"
+            else -> "https://images.unsplash.com/photo-1556742044-3c52d6e88c62?w=800"
+        }
     }
 
     Scaffold(
@@ -138,8 +248,11 @@ fun ProductDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { }) {
+                    IconButton(onClick = { showShareDialog = true }) {
                         Icon(Icons.Default.Share, contentDescription = "Share product")
+                    }
+                    IconButton(onClick = onHome) {
+                        Icon(Icons.Default.Home, contentDescription = "Home")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -154,8 +267,8 @@ fun ProductDetailScreen(
         bottomBar = {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                tonalElevation = 8.dp,
-                shadowElevation = 16.dp,
+                tonalElevation = 3.dp,
+                shadowElevation = 8.dp,
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Row(
@@ -165,13 +278,15 @@ fun ProductDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "R ${product.price}",
+                            text = "R ${String.format("%.2f", product.price)}",
                             style = MaterialTheme.typography.headlineSmall.copy(
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary
-                            )
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "per month",
@@ -179,15 +294,44 @@ fun ProductDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Spacer(modifier = Modifier.width(16.dp))
                     Button(
-                        onClick = { },
-                        shape = RoundedCornerShape(12.dp), // M3 compliant radii
+                        enabled = !isKycLoading,
+                        onClick = { 
+                            when {
+                                authViewModel.isGuest -> {
+                                    showGuestDialog = true
+                                }
+                                kycViewModel.uiState is KycUiState.Loading -> {
+                                    // Ignore click or show loading message
+                                }
+
+                                !isKycVerified -> {
+                                    showKycDialog = true
+                                }
+                                else -> {
+                                    AnalyticsManager.logAddToCart(
+                                        itemId = product.id.toString(),
+                                        itemName = product.name,
+                                        price = product.price.toDouble()
+                                    )
+                                    viewModel.startFulfillment(product)
+                                    onApply()
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
-                            .height(52.dp)
-                            .fillMaxWidth(0.65f),
+                            .height(56.dp)
+                            .weight(1.2f),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                     ) {
-                        Text("Add to cart", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                        Text(
+                            text = productType.actionButtonText(),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
@@ -202,22 +346,31 @@ fun ProductDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(320.dp)
+                    .height(300.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
             ) {
                 AsyncImage(
                     model = if (product.imageUrl.contains("placeholder") || product.imageUrl.isEmpty()) fallbackImage else product.imageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().padding(40.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp)
                 )
             }
 
             Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "Description",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
                 val description = product.description
                 val annotatedString = buildAnnotatedString {
-                    val limit = 120
+                    val limit = 150
                     if (isExpanded || description.length <= limit) {
                         append(description)
                         append(" ")
@@ -226,10 +379,12 @@ fun ProductDetailScreen(
                         append("... ")
                     }
 
-                    withStyle(style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )) {
+                    withStyle(
+                        style = SpanStyle(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
                         append(if (isExpanded) "Read less" else "Read more")
                     }
                 }
@@ -243,48 +398,96 @@ fun ProductDetailScreen(
                 )
 
                 if (isExpanded) {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     Text(
                         text = "Key Benefits",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    benefits.forEach { benefit ->
-                        BenefitItem(benefit)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        benefits.forEach { benefit ->
+                            BenefitItem(benefit)
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     Text(
                         text = "Requirements",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    requirements.forEach { requirement ->
-                        BenefitItem(requirement)
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        requirements.forEach { requirement ->
+                            AssistChip(
+                                onClick = { },
+                                label = { Text(requirement) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(40.dp))
+                
+                if (relatedProducts.isNotEmpty() || exploreMoreProducts.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
 
-                Text(
-                    text = "You might also like",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    items(relatedProducts) { related ->
-                        RelatedProductItem(related)
+                if (relatedProducts.isNotEmpty()) {
+                    Text(
+                        text = "You might also like",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 8.dp)
+                    ) {
+                        items(if (relatedProducts.size > 5) relatedProducts.take(5) else relatedProducts) { related ->
+                            RelatedProductItem(related) {
+                                onProductClick(related.id)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+
+                if (exploreMoreProducts.isNotEmpty()) {
+                    Text(
+                        text = "Explore more",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
+                        items(exploreMoreProducts) { related ->
+                            RelatedProductItem(related) {
+                                onProductClick(related.id)
+                            }
+                        }
                     }
                 }
             }
@@ -294,44 +497,54 @@ fun ProductDetailScreen(
 
 @Composable
 fun BenefitItem(text: String) {
-    Row(
-        modifier = Modifier.padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            modifier = Modifier.size(6.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary
-        ) {}
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+    ListItem(
+        headlineContent = { 
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            ) 
+        },
+        leadingContent = {
+            Surface(
+                modifier = Modifier.size(8.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary
+            ) {}
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
 
 @Composable
-fun RelatedProductItem(product: ProductDto) {
+fun RelatedProductItem(product: ProductDto, onClick: () -> Unit) {
     val fallbackImage = when {
         product.name.contains("Insurance", ignoreCase = true) -> "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400"
         product.name.contains("Investment", ignoreCase = true) -> "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400"
         else -> "https://images.unsplash.com/photo-1556742044-3c52d6e88c62?w=400"
     }
 
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier.width(180.dp)
+    ElevatedCard(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier
+            .width(180.dp)
+            .clickable(onClick = onClick)
     ) {
         Column {
-            Box(modifier = Modifier.fillMaxWidth().height(120.dp).background(Color.White)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .background(Color.White)
+            ) {
                 AsyncImage(
                     model = if (product.imageUrl.contains("placeholder") || product.imageUrl.isEmpty()) fallbackImage else product.imageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().padding(12.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp)
                 )
             }
             Column(modifier = Modifier.padding(12.dp)) {
@@ -342,9 +555,10 @@ fun RelatedProductItem(product: ProductDto) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "from R ${product.price}",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "from R ${String.format("%.2f", product.price)}",
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
@@ -366,17 +580,26 @@ enum class ProductType(val label: String) {
     }
 
     fun actionButtonText(): String = when (this) {
-        INVESTMENT -> "Open Investment"
-        INSURANCE -> "Get Cover Now"
-        CONTRACT -> "Apply for Contract"
+        INVESTMENT -> "Start Investing"
+        INSURANCE -> "Get a Quote"
+        CONTRACT -> "Apply Now"
     }
 
     companion object {
         fun fromProduct(product: ProductDto): ProductType {
             return when {
-                product.name.contains("Investment", ignoreCase = true) -> INVESTMENT
-                product.name.contains("Insurance", ignoreCase = true) -> INSURANCE
-                else -> CONTRACT
+                product.name.contains("Investment", ignoreCase = true) ||
+                        product.name.contains("VIP", ignoreCase = true) ||
+                        product.name.contains("Islamic", ignoreCase = true) ||
+                        product.name.contains("Short-Term", ignoreCase = true) ->
+                    INVESTMENT
+
+                product.name.contains("Insurance", ignoreCase = true) ||
+                        product.name.contains("Commercial", ignoreCase = true) ->
+                    INSURANCE
+
+                else ->
+                    CONTRACT
             }
         }
     }

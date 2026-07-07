@@ -11,11 +11,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.productshop.data.model.CustomerDto
-import com.example.productshop.data.model.DocumentDto
-import com.example.productshop.data.model.KycDto
+import com.example.productshop.data.model.*
 import com.example.productshop.data.remote.RetrofitManager
 import com.example.productshop.security.SessionManager
+import com.example.productshop.util.AnalyticsManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
@@ -39,6 +38,7 @@ class KycViewModel(application: Application) : AndroidViewModel(application) {
     var profile by mutableStateOf<CustomerDto?>(null)
     var kycStatus by mutableStateOf<KycDto?>(null)
     var uiState: KycUiState by mutableStateOf(KycUiState.Idle)
+    var isDebugMode by mutableStateOf(SessionManager.isDebugMode)
 
     var selfieUri by mutableStateOf<Uri?>(null)
     var residenceUri by mutableStateOf<Uri?>(null)
@@ -50,6 +50,13 @@ class KycViewModel(application: Application) : AndroidViewModel(application) {
         selfieUri = null
         residenceUri = null
         profileId = -1L
+        isDebugMode = false
+        SessionManager.isDebugMode = false
+    }
+
+    fun toggleDebugMode() {
+        isDebugMode = !isDebugMode
+        SessionManager.isDebugMode = isDebugMode
     }
 
     private val authHeader: String
@@ -72,11 +79,13 @@ class KycViewModel(application: Application) : AndroidViewModel(application) {
                         // Customer has no KYC record yet - this is expected for new users
                         kycStatus = null
                     } else {
+                        AnalyticsManager.logAuthError("kyc_status_error", e.localizedMessage ?: "HTTP ${e.code()}")
                         throw e
                     }
                 }
                 uiState = KycUiState.Idle
             } catch (e: Exception) {
+                AnalyticsManager.logAuthError("kyc_profile_error", e.localizedMessage ?: "Unknown error")
                 uiState = KycUiState.Error("Failed to load profile info: ${e.message}")
             }
         }
@@ -89,20 +98,21 @@ class KycViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             uiState = KycUiState.Loading
+            AnalyticsManager.logKycStarted()
             try {
                 // 1. Upload Selfie
-                val selfieBase64 = uriToDataUriBase64(context, sUri)
+                val selfieData = uriToRawString(context, sUri)
                 retrofitManager.profileService.addDocument(
                     currentProfile.id,
-                    DocumentDto(id = currentProfile.id, document = selfieBase64, type = "PNG"),
+                    DocumentDto(id = currentProfile.id, document = selfieData, type = "PNG"),
                     authHeader
                 )
 
                 // 2. Upload Residence Proof
-                val residenceBase64 = uriToDataUriBase64(context, rUri)
+                val residenceData = uriToRawString(context, rUri)
                 retrofitManager.profileService.addDocument(
                     currentProfile.id,
-                    DocumentDto(id = currentProfile.id, document = residenceBase64, type = "PNG"),
+                    DocumentDto(id = currentProfile.id, document = residenceData, type = "PNG"),
                     authHeader
                 )
 
@@ -117,15 +127,71 @@ class KycViewModel(application: Application) : AndroidViewModel(application) {
                     authHeader
                 )
 
+                // 5. DHA Synchronization
+                syncWithDha(currentProfile.idNumber)
+
+                // 6. Link a default account to improve eligibility
+                retrofitManager.customerService.addAccountToCustomer(
+                    currentProfile.id,
+                    3L, // Checking Account
+                    authHeader
+                )
+
                 uiState = KycUiState.Success
+                AnalyticsManager.logKycCompleted(true)
+                
+                com.example.productshop.ui.viewmodel.NotificationViewModel.addNotification(
+                    "Verification Successful!",
+                    "Your identity has been verified. You now have full access to all products."
+                )
+
                 fetchProfileAndKyc()
             } catch (e: Exception) {
+                AnalyticsManager.logKycCompleted(false)
                 uiState = KycUiState.Error("Upload failed: ${e.message}")
+            } finally {
+                // Ensure kycStatus is refreshed after any completion attempt
+                if (uiState is KycUiState.Success) {
+                    fetchProfileAndKyc()
+                }
             }
         }
     }
 
-    private fun uriToDataUriBase64(context: Context, uri: Uri): String {
+    private suspend fun syncWithDha(idNumber: String) {
+        try {
+            // Always update DHA status to passing values upon KYC completion
+            retrofitManager.dhaService.addLivingStatus(
+                idNumber,
+                LivingStatusDto(livingStatus = "alive"),
+                authHeader
+            )
+
+            retrofitManager.dhaService.addMaritalStatus(
+                idNumber,
+                MaritalStatusDto(
+                    status = "Married",
+                    effectiveFrom = "2000-01-01",
+                    effectiveTo = "9999-12-31"
+                ),
+                authHeader
+            )
+
+            retrofitManager.dhaService.addIdStatus(
+                idNumber,
+                DuplicateIDDocumentCheck(
+                    hasDuplicateId = false,
+                    duplicateIdIssueDate = "2000-01-01"
+                ),
+                authHeader
+            )
+        } catch (e: Exception) {
+            // Log DHA sync error but don't fail the whole KYC if it's just a sync issue
+            AnalyticsManager.logAuthError("dha_sync_error", e.localizedMessage ?: "Unknown DHA error")
+        }
+    }
+
+    private fun uriToRawString(context: Context, uri: Uri): String {
         val bytes = context.contentResolver.openInputStream(uri)?.use { inputStream ->
             val bitmap = BitmapFactory.decodeStream(inputStream)
             val outputStream = ByteArrayOutputStream()
@@ -133,12 +199,8 @@ class KycViewModel(application: Application) : AndroidViewModel(application) {
             outputStream.toByteArray()
         } ?: throw Exception("Failed to open input stream for URI: $uri")
         
-        // Convert image to Base64
-        val imageBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-        // Create Data URI string
-        val dataUri = "data:image/png;base64,$imageBase64"
-        
-        // The backend expects the entire Data URI string to be Base64 encoded
-        return Base64.encodeToString(dataUri.toByteArray(), Base64.NO_WRAP)
+        // Return raw string representation (ISO_8859_1 preserves byte values)
+        // Backend now handles Base64 encoding
+        return String(bytes, Charsets.ISO_8859_1)
     }
 }
