@@ -1,0 +1,23 @@
+# Task Management
+
+- [x] Researching Profile and Session Management
+- [x] Developing Implementation Plan (Profiles)
+- [x] Implement Profile Management
+- [x] Verification (Profiles)
+- [x] Help & Support and Settings Improvements
+- [x] Implement Help & Support
+- [x] Improve Settings
+- [x] Fix Navigation Backstack (Initial)
+- [x] Verification (Initial)
+- [/] Refine Navigation, Support, and Cleanup
+    - [x] Research Account Screen and Navigation logic
+    - [x] Develop refined Implementation Plan
+- [ ] Fix Navigation Backstack (Final)
+    - [ ] Refine `BackHandler` in `DiscoverScreen`
+- [ ] Connect Support in Account
+    - [ ] Update `AccountScreen` parameters and UI
+    - [ ] Update `NavGraph` and `DiscoverScreen` to pass support lambda
+- [ ] Remove Debug Options
+    - [ ] Cleanup `KycViewModel`
+    - [ ] Cleanup `AccountScreen` UI
+- [ ] Verification (Final)

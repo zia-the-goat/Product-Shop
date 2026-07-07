@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Shop Deep Link Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .section { margin-bottom: 30px; border-bottom: 1px solid #ccc; padding-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Product Shop Deep Link Test</h1>
+
+    <div class="section">
+        <h2>Custom Scheme Link</h2>
+        <p>This uses <code>productshop://open</code></p>
+        <a href="productshop://open" class="button">Open Product Shop App</a>
+    </div>
+
+    <div class="section">
+        <h2>HTTPS Link (App Link)</h2>
+        <p>This uses <code>https://boozy-supply-ripping.ngrok-free.dev/open</code></p>
+        <a href="https://boozy-supply-ripping.ngrok-free.dev/open" class="button">Open Product Shop via HTTPS</a>
+    </div>
+
+    <div class="section">
+        <h2>Manual ADB Commands</h2>
+        <p>You can also test via terminal if the device is connected:</p>
+        <pre>adb shell am start -W -a android.intent.action.VIEW -d "productshop://open" com.example.productshop</pre>
+        <pre>adb shell am start -W -a android.intent.action.VIEW -d "https://boozy-supply-ripping.ngrok-free.dev/open" com.example.productshop</pre>
+    </div>
+</body>
+</html>
