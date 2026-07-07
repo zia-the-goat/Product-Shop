@@ -1,0 +1,211 @@
+:root {
+    /* MD3 Color Palette (Light Mode - Purple/Violet base) */
+    --md-sys-color-primary: #6750A4;
+    --md-sys-color-on-primary: #FFFFFF;
+    --md-sys-color-primary-container: #EADDFF;
+    --md-sys-color-on-primary-container: #21005D;
+    --md-sys-color-secondary: #625B71;
+    --md-sys-color-on-secondary: #FFFFFF;
+    --md-sys-color-surface: #FEF7FF;
+    --md-sys-color-on-surface: #1D1B20;
+    --md-sys-color-surface-variant: #E7E0EC;
+    --md-sys-color-on-surface-variant: #49454F;
+    --md-sys-color-outline: #79747E;
+
+    --font-main: 'Roboto', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-main);
+    background-color: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+.container {
+    padding: 0 16px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* App Bar */
+.app-bar {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    background-color: var(--md-sys-color-surface);
+    border-bottom: 1px solid var(--md-sys-color-surface-variant);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.app-bar .container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.logo {
+    height: 32px;
+    width: 32px;
+    margin-right: 12px;
+    background-color: var(--md-sys-color-primary-container);
+    border-radius: 8px; /* Placeholder styling */
+}
+
+.app-name {
+    font-size: 22px;
+    font-weight: 500;
+}
+
+/* Hero Section */
+.hero {
+    padding: 48px 0;
+    text-align: center;
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+}
+
+.hero-title {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.hero-subtitle {
+    font-size: 18px;
+    margin-bottom: 32px;
+    opacity: 0.8;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 10px 24px;
+    border-radius: 20px; /* MD3 Pill */
+    text-decoration: none;
+    font-weight: 500;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn-primary {
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+}
+
+.btn-primary:hover {
+    background-color: #55418b;
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+/* Screenshot Grid */
+.screenshots {
+    padding: 48px 0;
+}
+
+.section-title {
+    font-size: 24px;
+    font-weight: 500;
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.screenshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+}
+
+.screenshot-card {
+    background-color: var(--md-sys-color-surface-variant);
+    border-radius: 16px;
+    padding: 12px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.screenshot-card img {
+    width: 100%;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    aspect-ratio: 9 / 19;
+    object-fit: cover;
+    background-color: #eee; /* Placeholder bg */
+}
+
+.screenshot-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Features */
+.features {
+    padding: 48px 0;
+    background-color: var(--md-sys-color-surface);
+}
+
+.feature-list {
+    list-style: none;
+}
+
+.feature-list li {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    padding: 16px;
+    background-color: var(--md-sys-color-surface-variant);
+    border-radius: 12px;
+}
+
+.feature-icon {
+    font-size: 24px;
+    margin-right: 16px;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--md-sys-color-primary-container);
+    border-radius: 50%;
+}
+
+.feature-list h3 {
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+.feature-list p {
+    font-size: 14px;
+    color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Footer */
+.footer {
+    padding: 32px 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--md-sys-color-outline);
+    border-top: 1px solid var(--md-sys-color-surface-variant);
+}
+
+/* Desktop adjustments */
+@media (min-width: 600px) {
+    .hero-title {
+        font-size: 48px;
+    }
+    .screenshot-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
