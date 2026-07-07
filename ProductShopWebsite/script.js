@@ -5,39 +5,72 @@
 const APP_SCHEME = "productshop://open";
 const APK_URL = "ProductShop.apk";
 const MODAL_ID = "warning-modal";
+const PACKAGE_NAME = "com.example.productshop";
 
 /**
- * Handles the "Download APK" button click.
- * Tries to detect if the app is installed first.
+ * Main entry point for the download button.
+ * Uses a tiered approach for app detection.
  */
-function handleDownloadClick() {
-    console.log("Download clicked, checking for app...");
+async function handleDownloadClick() {
+    console.log("Download clicked, starting detection flow...");
 
-    // Heuristic: Try to open the app via its custom scheme.
-    // If the app is installed, the browser will likely lose focus.
-    const start = Date.now();
+    // 1. Tier 1: Official navigator.getInstalledRelatedApps()
+    const isInstalledOfficial = await checkAppInstalledOfficial();
 
-    // Attempt to launch the app
-    window.location.href = APP_SCHEME;
+    if (isInstalledOfficial) {
+        console.log("App detected via official API.");
+        showModal();
+        return;
+    }
 
-    // After a short delay, check if we are still on the page and focused.
-    setTimeout(() => {
-        const elapsed = Date.now() - start;
-
-        // If elapsed time is short, it means the browser likely didn't switch away.
-        // If document still has focus, the app probably didn't open.
-        if (document.hasFocus() && elapsed < 3000) {
-            console.log("App not detected or failed to open. Proceeding to download.");
-            initiateDownload();
-        } else {
-            console.log("App might be installed (browser lost focus). Showing warning.");
-            showModal();
-        }
-    }, 1500);
+    // 2. Tier 2: Heuristic check (Custom Scheme attempt)
+    runHeuristicCheck();
 }
 
 /**
- * Directly starts the APK download.
+ * Uses the official API to detect if the app is installed.
+ * Requires Digital Asset Links (assetlinks.json) to be correctly configured.
+ */
+async function checkAppInstalledOfficial() {
+    if ('getInstalledRelatedApps' in navigator) {
+        try {
+            const relatedApps = await navigator.getInstalledRelatedApps();
+            return relatedApps.some(app => app.id === PACKAGE_NAME);
+        } catch (error) {
+            console.warn("getInstalledRelatedApps failed:", error);
+            return false;
+        }
+    }
+    return false;
+}
+
+/**
+ * Tries to open the app via its custom scheme.
+ * If the browser loses focus, we suspect the app is installed.
+ */
+function runHeuristicCheck() {
+    const start = Date.now();
+
+    // Attempt to launch the app
+    // We use a temporary iframe or window location to avoid hard redirects
+    window.location.href = APP_SCHEME;
+
+    setTimeout(() => {
+        const elapsed = Date.now() - start;
+
+        // If elapsed time is long or document lost focus, app likely opened
+        if (document.hasFocus() && elapsed < 2500) {
+            console.log("App not detected via heuristic. Starting download.");
+            initiateDownload();
+        } else {
+            console.log("App suspected via heuristic. Showing modal.");
+            showModal();
+        }
+    }, 1200);
+}
+
+/**
+ * Triggers the APK download by creating a hidden anchor.
  */
 function initiateDownload() {
     const link = document.createElement('a');
@@ -46,6 +79,15 @@ function initiateDownload() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+/**
+ * Opens the app using its custom URI scheme.
+ */
+function openApp() {
+    console.log("Attempting to open existing app...");
+    closeModal();
+    window.location.href = APP_SCHEME;
 }
 
 /**
@@ -63,7 +105,7 @@ function closeModal() {
 }
 
 /**
- * User confirmed they want to download despite detection.
+ * Proceeds with download from the modal.
  */
 function proceedWithDownload() {
     closeModal();
