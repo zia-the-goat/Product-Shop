@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  "name": "product-shop",
+
+  "compatibility_date": "2026-07-08",
+
+  "assets": {
+    "directory": "./ProductShopWebsite"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
