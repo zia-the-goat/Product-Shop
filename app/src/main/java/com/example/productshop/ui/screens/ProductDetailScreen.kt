@@ -141,14 +141,16 @@ fun ProductDetailScreen(
             title = { Text("Share Product") },
             text = {
                 val uriHandler = LocalUriHandler.current
+                val productIdShared = product?.id ?: productId
+                val shareUri = "productshop://share?product=$productIdShared"
                 val annotatedString = buildAnnotatedString {
                     append("Click the link to open the app: ")
-                    pushStringAnnotation(tag = "URL", annotation = "productshop://open")
+                    pushStringAnnotation(tag = "URL", annotation = shareUri)
                     withStyle(style = SpanStyle(
                         color = MaterialTheme.colorScheme.primary,
                         textDecoration = TextDecoration.Underline)
                     ) {
-                        append("productshop://open")
+                        append(shareUri)
                     }
                     pop()
                 }
@@ -177,6 +179,9 @@ fun ProductDetailScreen(
         product?.let {
             AnalyticsManager.logSelectContent("product_view", it.id.toString())
         }
+        if (viewModel.products.isEmpty()) {
+            viewModel.fetchProducts()
+        }
         if (!authViewModel.isGuest) {
             kycViewModel.fetchProfileAndKyc()
         }
@@ -186,8 +191,12 @@ fun ProductDetailScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     if (product == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Product not found", style = MaterialTheme.typography.titleLarge)
+        if (viewModel.isLoading || viewModel.products.isEmpty()) {
+            com.example.productshop.ui.components.ProductDetailSkeleton()
+        } else {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Product not found", style = MaterialTheme.typography.titleLarge)
+            }
         }
         return
     }
