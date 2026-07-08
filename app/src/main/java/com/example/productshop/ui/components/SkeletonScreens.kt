@@ -101,3 +101,24 @@ fun GenericSkeleton() {
         }
     }
 }
+
+@Composable
+fun ProductDetailSkeleton() {
+    val brush = getShimmerBrush()
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(modifier = Modifier.fillMaxWidth().height(300.dp).background(brush))
+        Column(modifier = Modifier.padding(24.dp)) {
+            Box(modifier = Modifier.width(120.dp).height(24.dp).background(brush, shape = RoundedCornerShape(4.dp)))
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(brush, shape = RoundedCornerShape(8.dp)))
+            Spacer(modifier = Modifier.height(32.dp))
+            Box(modifier = Modifier.width(100.dp).height(24.dp).background(brush, shape = RoundedCornerShape(4.dp)))
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(3) {
+                    Box(modifier = Modifier.width(80.dp).height(32.dp).background(brush, shape = RoundedCornerShape(16.dp)))
+                }
+            }
+        }
+    }
+}

@@ -166,7 +166,9 @@ fun ProductNavHost(
                 )
             }
 
-            composable(Screen.Discover.route) {
+            composable(
+                Screen.Discover.route
+            ) {
                 DiscoverScreen(
                     selectedTab = 0,
                     viewModel = productViewModel,
@@ -312,7 +314,11 @@ fun ProductNavHost(
 
             composable(
                 route = Screen.Detail.route,
-                arguments = listOf(navArgument("productId") { type = NavType.LongType })
+                arguments = listOf(navArgument("productId") { type = NavType.LongType }),
+                deepLinks = listOf(
+                    navDeepLink { uriPattern = "productshop://share/id={productId}"},
+                    navDeepLink { uriPattern = "productshop://share?product={productId}"}
+                )
             ) { backStackEntry ->
                 val productId = backStackEntry.arguments?.getLong("productId") ?: return@composable
                 ProductDetailScreen(
