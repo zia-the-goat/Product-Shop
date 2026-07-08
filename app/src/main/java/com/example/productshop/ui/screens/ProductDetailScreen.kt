@@ -91,7 +91,6 @@ fun ProductDetailScreen(
     
     var showGuestDialog by remember { mutableStateOf(false) }
     var showKycDialog by remember { mutableStateOf(false) }
-    var showShareDialog by remember { mutableStateOf(false) }
 
     if (showGuestDialog) {
         AlertDialog(
@@ -135,44 +134,16 @@ fun ProductDetailScreen(
         )
     }
 
-    if (showShareDialog) {
-        AlertDialog(
-            onDismissRequest = { showShareDialog = false },
-            title = { Text("Share Product") },
-            text = {
-                val uriHandler = LocalUriHandler.current
-                val productIdShared = product?.id ?: productId
-                val shareUri = "productshop://share?product=$productIdShared"
-                val annotatedString = buildAnnotatedString {
-                    append("Click the link to open the app: ")
-                    pushStringAnnotation(tag = "URL", annotation = shareUri)
-                    withStyle(style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        textDecoration = TextDecoration.Underline)
-                    ) {
-                        append(shareUri)
-                    }
-                    pop()
-                }
-                ClickableText(
-                    text = annotatedString,
-                    onClick = { offset ->
-                        annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                            .firstOrNull()?.let { annotation ->
-                                uriHandler.openUri(annotation.item)
-                            }
-                    },
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showShareDialog = false }) {
-                    Text("Close")
-                }
-            }
-        )
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val shareProduct: (ProductDto) -> Unit = { p ->
+        val shareUri = "https://product-shop.ziauddeen-mohamad.workers.dev/?product=${p.id}"
+        val sendIntent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            putExtra(android.content.Intent.EXTRA_TEXT, "Check out this ${p.name} on Product Shop: $shareUri")
+            type = "text/plain"
+        }
+        val shareIntent = android.content.Intent.createChooser(sendIntent, "Share ${p.name}")
+        context.startActivity(shareIntent)
     }
     
     LaunchedEffect(product) {
@@ -257,7 +228,7 @@ fun ProductDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showShareDialog = true }) {
+                    IconButton(onClick = { product?.let { shareProduct(it) } }) {
                         Icon(Icons.Default.Share, contentDescription = "Share product")
                     }
                     IconButton(onClick = onHome) {
