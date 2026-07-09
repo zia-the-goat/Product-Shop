@@ -57,6 +57,7 @@ fun ProductNavHost(
     settingsViewModel: com.example.productshop.ui.viewmodel.SettingsViewModel
 ) {
     var loadingRoute by remember { mutableStateOf<String?>(null) }
+    var isDeepLinking by remember { mutableStateOf(false) }
 
     // Helper to navigate with a skeleton loader
     val navigateWithLoading: (String, (androidx.navigation.NavOptionsBuilder.() -> Unit)?) -> Unit = { route, builder ->
@@ -77,11 +78,16 @@ fun ProductNavHost(
     // Handle deep links manually to preserve backstack
     LaunchedEffect(navController) {
         DeepLinkManager.deepLinkUri.collect { uri ->
-            val productId = uri.getQueryParameter("product")?.toLongOrNull()
-            if (productId != null) {
-                navController.navigate(Screen.Detail.createRoute(productId))
-            } else if (uri.host == "open") {
-                navController.navigate(Screen.Discover.route)
+            if (uri != null) {
+                val productId = uri.getQueryParameter("product")?.toLongOrNull()
+                if (productId != null) {
+                    isDeepLinking = true
+                    navController.navigate(Screen.Detail.createRoute(productId))
+                } else if (uri.host == "open") {
+                    isDeepLinking = true
+                    navController.navigate(Screen.Discover.route)
+                }
+                DeepLinkManager.consumeDeepLink()
             }
         }
     }
@@ -126,7 +132,7 @@ fun ProductNavHost(
                 route = Screen.Splash.route
             ) {
                 SplashScreen(onSplashFinished = {
-                    if (navController.currentDestination?.route == Screen.Splash.route) {
+                    if (navController.currentDestination?.route == Screen.Splash.route && !isDeepLinking) {
                         if (SessionManager.hasToken()) {
                             navigateWithLoading(Screen.Discover.route) {
                                 popUpTo(Screen.Splash.route) { inclusive = true }
