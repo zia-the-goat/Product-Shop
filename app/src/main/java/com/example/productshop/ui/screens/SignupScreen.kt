@@ -74,9 +74,10 @@ fun SignupScreen(
     val randomIdPlaceholder = remember { IdValidationUtils.generateRandomId() }
 
     val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[a-z]{2,}\$".toRegex()
+    val nameRegex = "^[A-Za-z ]+\$".toRegex()
     val isEmailValid = email.matches(emailRegex)
-    val isFirstNameValid = firstName.isNotBlank()
-    val isLastNameValid = lastName.isNotBlank()
+    val isFirstNameValid = firstName.isNotBlank() && firstName.matches(nameRegex)
+    val isLastNameValid = lastName.isNotBlank() && lastName.matches(nameRegex)
     val isIdNumberValid = IdValidationUtils.isValidSouthAfricanId(idNumber)
     
     val uiState = viewModel.uiState
@@ -97,6 +98,24 @@ fun SignupScreen(
 
     val isApiError = uiState is AuthUiState.Error
     val isOtpSent = uiState is AuthUiState.OtpSent || (uiState is AuthUiState.Error && uiState.isOtpError)
+
+    val isAccountTypeCompatible = remember(customerTypeId, selectedAccountTypeIds) {
+        val retailIds = 1L..5L
+        val commercialIds = 6L..8L
+        
+        when (customerTypeId) {
+            1L -> selectedAccountTypeIds.all { it in retailIds }
+            2L, 3L, 4L -> selectedAccountTypeIds.all { it in commercialIds }
+            5L -> true
+            else -> true
+        }
+    }
+    
+    val accountTypeErrorMessage = remember(customerTypeId, isAccountTypeCompatible) {
+        if (isAccountTypeCompatible) null
+        else if (customerTypeId == 1L) "Individuals can only select Retail accounts (Gold, Platinum, etc.)"
+        else "Business customers can only select Commercial accounts (SME, Medium, Large)"
+    }
 
     fun shouldShowError(dirty: Boolean, valid: Boolean): Boolean {
         return (dirty || hasBeenSubmitted) && !valid
@@ -206,7 +225,7 @@ fun SignupScreen(
                 isError = shouldShowError(firstNameDirty, isFirstNameValid),
                 supportingText = {
                     if (shouldShowError(firstNameDirty, isFirstNameValid)) {
-                        Text("First name is required", style = MaterialTheme.typography.bodySmall)
+                        Text("First name should only contain letters", style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
@@ -238,7 +257,7 @@ fun SignupScreen(
                 isError = shouldShowError(lastNameDirty, isLastNameValid),
                 supportingText = {
                     if (shouldShowError(lastNameDirty, isLastNameValid)) {
-                        Text("Last name is required", style = MaterialTheme.typography.bodySmall)
+                        Text("Last name should only contain letters", style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
@@ -360,6 +379,15 @@ fun SignupScreen(
                     color = Color.White.copy(alpha = 0.5f),
                     modifier = Modifier.padding(top = 4.dp)
                 )
+
+                if (accountTypeErrorMessage != null) {
+                    Text(
+                        text = accountTypeErrorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -638,6 +666,7 @@ fun SignupScreen(
                     hasBeenSubmitted = true
                     if (isEmailValid && isFirstNameValid && isLastNameValid && 
                         isIdNumberValid && isPasswordValid && isConfirmPasswordValid &&
+                        isAccountTypeCompatible &&
                         (customerTypeId != 5L || systemPassword.isNotEmpty())) {
                         if (isOtpSent) {
                             viewModel.signup(email, password, firstName, lastName, idNumber, customerTypeId, selectedAccountTypeIds.toList(), otp, systemPassword, onBack)
@@ -670,9 +699,9 @@ fun SignupScreen(
 
             // Summary Error Message
             if (hasBeenSubmitted && !(isEmailValid && isFirstNameValid && isLastNameValid && 
-                isIdNumberValid && isPasswordValid && isConfirmPasswordValid)) {
+                isIdNumberValid && isPasswordValid && isConfirmPasswordValid && isAccountTypeCompatible)) {
                 Text(
-                    text = "Please complete all fields correctly",
+                    text = if (!isAccountTypeCompatible) "Invalid Account/Customer type selection" else "Please complete all fields correctly",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp)

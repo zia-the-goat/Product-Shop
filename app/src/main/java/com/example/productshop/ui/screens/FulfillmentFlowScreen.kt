@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
@@ -147,9 +148,7 @@ fun FulfillmentFlowScreen(
                         Button(
                             onClick = { 
                                 if (currentStep == 3) {
-                                    viewModel.validateEligibility {
-                                        currentStep++
-                                    }
+                                    currentStep++
                                 } else {
                                     currentStep++
                                 }
@@ -163,7 +162,7 @@ fun FulfillmentFlowScreen(
                                 Text("Verifying...")
                             } else {
                                 Text("Continue")
-                                Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                             }
                         }
                     } else {
@@ -284,7 +283,7 @@ fun FulfillmentErrorUI(
     }
     
     val requiredCheckNames = baseCheckPatterns + listOf("Customer Type", "Account Type")
-    AnalyticsManager.logEvent("Fulfillment Error", Bundle().apply { putString("Message", message) })
+    AnalyticsManager.logEvent("fulfillment_error", Bundle().apply { putString("Message", message) })
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.Center,
@@ -298,14 +297,15 @@ fun FulfillmentErrorUI(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Verification Incomplete",
+            text = if (message == "Subscription Incomplete") "Subscription Incomplete" else "Verification Incomplete",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "We were unable to verify some requirements for this ${productType.label.lowercase()}.",
+            text = if (message.contains("Server Error")) "A technical error occurred on our end. We're looking into it."
+                   else "We were unable to verify some requirements for this ${productType.label.lowercase()}.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant

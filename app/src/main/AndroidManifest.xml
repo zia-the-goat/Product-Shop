@@ -23,6 +23,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.ProductShop"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -51,6 +52,10 @@
                 <data android:scheme="https" android:host="boozy-supply-ripping.ngrok-free.dev" android:path="/open" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name="com.canhub.cropper.CropImageActivity"
+            android:theme="@style/Base.Theme.AppCompat" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

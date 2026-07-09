@@ -9,6 +9,7 @@ import java.io.File
 class ProductShopApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        com.example.productshop.security.SessionManager.initialize(this)
         AnalyticsManager.initialize(this)
         initializeEnv()
         migrateSystemPassword()

@@ -22,6 +22,7 @@ import com.example.productshop.ui.viewmodel.ProductViewModel
 import com.example.productshop.ui.viewmodel.SubscriptionViewModel
 import com.example.productshop.ui.components.SignupSkeleton
 import com.example.productshop.ui.components.GenericSkeleton
+import com.example.productshop.util.DeepLinkManager
 import kotlinx.coroutines.delay
 
 sealed class Screen(val route: String) {
@@ -73,6 +74,18 @@ fun ProductNavHost(
         }
     }
 
+    // Handle deep links manually to preserve backstack
+    LaunchedEffect(navController) {
+        DeepLinkManager.deepLinkUri.collect { uri ->
+            val productId = uri.getQueryParameter("product")?.toLongOrNull()
+            if (productId != null) {
+                navController.navigate(Screen.Detail.createRoute(productId))
+            } else if (uri.host == "open") {
+                navController.navigate(Screen.Discover.route)
+            }
+        }
+    }
+
     // Reset loading state when destination is reached
     DisposableEffect(navController) {
         val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
@@ -110,15 +123,19 @@ fun ProductNavHost(
             }
         ) {
             composable(
-                route = Screen.Splash.route,
-                deepLinks = listOf(
-                    navDeepLink { uriPattern = "productshop://open" },
-                    navDeepLink { uriPattern = "https://boozy-supply-ripping.ngrok-free.dev/open" }
-                )
+                route = Screen.Splash.route
             ) {
                 SplashScreen(onSplashFinished = {
-                    navigateWithLoading(Screen.Landing.route) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    if (navController.currentDestination?.route == Screen.Splash.route) {
+                        if (SessionManager.hasToken()) {
+                            navigateWithLoading(Screen.Discover.route) {
+                                popUpTo(Screen.Splash.route) { inclusive = true }
+                            }
+                        } else {
+                            navigateWithLoading(Screen.Landing.route) {
+                                popUpTo(Screen.Splash.route) { inclusive = true }
+                            }
+                        }
                     }
                 })
             }
@@ -152,8 +169,16 @@ fun ProductNavHost(
                     onBack = { navController.popBackStack() },
                     onLoginSuccess = {
                         productViewModel.searchQuery = ""
-                        navigateWithLoading(Screen.Discover.route) {
-                            popUpTo(Screen.Landing.route) { inclusive = true }
+                        val pendingId = SessionManager.pendingProductId
+                        if (pendingId != null) {
+                            SessionManager.pendingProductId = null
+                            navigateWithLoading(Screen.Detail.createRoute(pendingId)) {
+                                popUpTo(Screen.Landing.route) { inclusive = true }
+                            }
+                        } else {
+                            navigateWithLoading(Screen.Discover.route) {
+                                popUpTo(Screen.Landing.route) { inclusive = true }
+                            }
                         }
                     }
                 )
@@ -314,11 +339,7 @@ fun ProductNavHost(
 
             composable(
                 route = Screen.Detail.route,
-                arguments = listOf(navArgument("productId") { type = NavType.LongType }),
-                deepLinks = listOf(
-                    navDeepLink { uriPattern = "productshop://share/id={productId}"},
-                    navDeepLink { uriPattern = "productshop://share?product={productId}"}
-                )
+                arguments = listOf(navArgument("productId") { type = NavType.LongType })
             ) { backStackEntry ->
                 val productId = backStackEntry.arguments?.getLong("productId") ?: return@composable
                 ProductDetailScreen(
@@ -327,7 +348,20 @@ fun ProductNavHost(
                     authViewModel = authViewModel,
                     kycViewModel = kycViewModel,
                     notificationViewModel = notificationViewModel,
-                    onBack = { navController.popBackStack() },
+                    onBack = { 
+                        val previousRoute = navController.previousBackStackEntry?.destination?.route
+                        val isAtRestrictedScreen = previousRoute == Screen.Splash.route || 
+                                                 previousRoute == Screen.Landing.route || 
+                                                 previousRoute == Screen.Login.route
+                        
+                        if (navController.previousBackStackEntry == null || (isAtRestrictedScreen && SessionManager.hasToken())) {
+                            navController.navigate(Screen.Discover.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        } else {
+                            navController.popBackStack()
+                        }
+                    },
                     onHome = onHome,
                     onApply = {
                         navigateWithLoading(Screen.Fulfillment.route, null)
@@ -335,7 +369,8 @@ fun ProductNavHost(
                     onProductClick = { id ->
                         navigateWithLoading(Screen.Detail.createRoute(id), null)
                     },
-                    onLoginRedirect = {
+                    onLoginRedirect = { id ->
+                        SessionManager.pendingProductId = id
                         navigateWithLoading(Screen.Login.route, null)
                     },
                     onKycRedirect = {

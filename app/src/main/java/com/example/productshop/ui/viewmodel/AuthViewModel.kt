@@ -37,20 +37,42 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val emailService = EmailService()
     private val profileManager = ProfileManager(application)
     
+    var isGuest by mutableStateOf(!SessionManager.hasToken())
+        private set
+
     init {
         NotificationViewModel.init(profileManager)
+        
+        // Restore session state if token is persisted
+        if (SessionManager.hasToken()) {
+            viewModelScope.launch {
+                try {
+                    val username = securityManager.getCredentials().first
+                    if (username != null) {
+                        val profile = retrofitManager.customerService.getCustomerByEmail(username, "Bearer ${SessionManager.bearerToken}")
+                        currentCustomer = profile
+                        KycViewModel.profileId = profile.id
+                        
+                        // Set profile pic and notifications
+                        profilePicturePath = profileManager.getProfilePicture(username)
+                        val savedNotifications = profileManager.getNotifications(username)
+                        NotificationViewModel.setNotifications(savedNotifications)
+                    }
+                } catch (e: Exception) {
+                    // Token might be expired or network error
+                    // SessionManager.clearSession() // Optional: auto-logout on failure
+                }
+            }
+        }
     }
 
     private var generatedOtp: String? = null
-    
+
     companion object {
         var currentCustomer: CustomerDto? = null
     }
 
     var uiState: AuthUiState by mutableStateOf(AuthUiState.Idle)
-        private set
-
-    var isGuest by mutableStateOf(false)
         private set
 
     var isBiometricPromptVisible by mutableStateOf(false)
@@ -109,7 +131,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun clearData() {
         currentCustomer = null
         uiState = AuthUiState.Idle
-        isGuest = false
+        isGuest = true
         failedAttempts = 0
         lockoutTimeRemaining = 0
         profilePicturePath = null

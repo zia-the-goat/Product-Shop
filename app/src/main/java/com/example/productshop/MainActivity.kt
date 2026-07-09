@@ -21,6 +21,7 @@ import com.example.productshop.ui.viewmodel.ProductViewModel
 import com.example.productshop.ui.viewmodel.SubscriptionViewModel
 import com.example.productshop.ui.viewmodel.SettingsViewModel
 import com.example.productshop.ui.theme.ProductShopTheme
+import com.example.productshop.util.DeepLinkManager
 
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -30,6 +31,8 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        DeepLinkManager.handleDeepLink(intent.data)
+
         // Handle navigation bar visibility
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -54,6 +57,12 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        DeepLinkManager.handleDeepLink(intent.data)
     }
 }
 

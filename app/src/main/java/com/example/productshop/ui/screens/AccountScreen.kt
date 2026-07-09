@@ -29,7 +29,10 @@ import com.example.productshop.ui.viewmodel.KycViewModel
 import coil.compose.AsyncImage
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 import androidx.compose.ui.tooling.preview.Preview
 
 @Preview(showBackground = true)
@@ -69,11 +72,11 @@ fun AccountScreen(
     val activeAccountId = securityManager.getActiveAccountTypeId()
     val authUiState = authViewModel.uiState
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            authViewModel.updateProfilePicture(it.toString())
+    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            result.uriContent?.let { uri ->
+                authViewModel.updateProfilePicture(uri.toString())
+            }
         }
     }
 
@@ -106,7 +109,17 @@ fun AccountScreen(
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer)
                 .clickable(enabled = !isGuest) {
-                    launcher.launch("image/*")
+                    val options = CropImageContractOptions(
+                        uri = null,
+                        cropImageOptions = CropImageOptions(
+                            guidelines = CropImageView.Guidelines.ON,
+                            fixAspectRatio = true,
+                            aspectRatioX = 1,
+                            aspectRatioY = 1,
+                            cropShape = CropImageView.CropShape.OVAL
+                        )
+                    )
+                    cropLauncher.launch(options)
                 },
             contentAlignment = Alignment.Center
         ) {

@@ -63,6 +63,7 @@ class KycViewModel(application: Application) : AndroidViewModel(application) {
         get() = "Bearer ${SessionManager.bearerToken}"
 
     fun fetchProfileAndKyc() {
+        if (!SessionManager.hasToken() && AuthViewModel.currentCustomer == null) return
         viewModelScope.launch {
             uiState = KycUiState.Loading
             try {
@@ -115,10 +116,6 @@ class KycViewModel(application: Application) : AndroidViewModel(application) {
                     DocumentDto(id = currentProfile.id, document = residenceData, type = "PNG"),
                     authHeader
                 )
-
-                // 3. Mock Verification Process
-                uiState = KycUiState.Verifying
-                delay(3000) // Simulate checking compliance
 
                 // 4. Update KYC Status on Backend
                 retrofitManager.kycService.updateKycStatus(

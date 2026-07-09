@@ -98,6 +98,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.android.image.cropper)
     implementation(libs.javax.mail)
     implementation(libs.javax.activation)
     implementation(platform("com.google.firebase:firebase-bom:34.14.0"))

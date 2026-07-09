@@ -4,6 +4,8 @@ import android.app.Application
 import com.example.productshop.data.model.*
 import com.example.productshop.data.remote.ProductService
 import com.example.productshop.data.remote.RetrofitManager
+import com.example.productshop.security.ProfileManager
+import com.example.productshop.security.SecurityManager
 import com.example.productshop.security.SessionManager
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
@@ -32,9 +34,18 @@ class ProductViewModelTest {
         mockkConstructor(RetrofitManager::class)
         every { anyConstructed<RetrofitManager>().service } returns productService
         
+        // Mock SecurityManager
+        mockkConstructor(SecurityManager::class)
+        every { anyConstructed<SecurityManager>().getActiveAccountTypeId() } returns 1L
+
+        // Mock ProfileManager
+        mockkConstructor(ProfileManager::class)
+        every { anyConstructed<ProfileManager>().getSubscriptionProgress(any(), any(), any()) } returns 1
+
         // Mock SessionManager
         mockkObject(SessionManager)
         every { SessionManager.bearerToken } returns "fake_token"
+        every { SessionManager.isDebugMode } returns false
         
         // Mock KycViewModel
         mockkObject(KycViewModel.Companion)
@@ -59,6 +70,21 @@ class ProductViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
         unmockkAll()
+    }
+
+    @Test
+    fun `validateEligibility skips when already verified`() = runTest {
+        val product = ProductDto(1, "Test Product", "Desc", 100.0, "")
+        viewModel.startFulfillment(product)
+        viewModel.fulfillmentUiState = FulfillmentUiState.Verified
+        
+        var called = false
+        viewModel.validateEligibility {
+            called = true
+        }
+        
+        assertTrue(called)
+        assertEquals(FulfillmentUiState.Verified, viewModel.fulfillmentUiState)
     }
 
     @Test

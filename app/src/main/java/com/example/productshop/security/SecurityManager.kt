@@ -44,6 +44,18 @@ class SecurityManager(context: Context) {
         return sharedPreferences.getLong("active_account_type_id", -1L)
     }
 
+    fun saveToken(token: String) {
+        sharedPreferences.edit().putString("bearer_token", token).apply()
+    }
+
+    fun getToken(): String? {
+        return sharedPreferences.getString("bearer_token", null)
+    }
+
+    fun clearToken() {
+        sharedPreferences.edit().remove("bearer_token").apply()
+    }
+
     fun saveSystemPassword(password: String) {
         sharedPreferences.edit().putString("system_password", password).apply()
     }
@@ -63,6 +75,7 @@ class SecurityManager(context: Context) {
             remove("email")
             remove("password")
             remove("active_account_type_id")
+            remove("bearer_token")
             apply()
         }
     }

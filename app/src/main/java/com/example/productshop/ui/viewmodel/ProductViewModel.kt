@@ -152,6 +152,11 @@ class ProductViewModel(application: android.app.Application) : androidx.lifecycl
     }
 
     fun validateEligibility(onSuccess: () -> Unit) {
+        if (fulfillmentUiState is FulfillmentUiState.Verified) {
+            onSuccess()
+            return
+        }
+
         val product = selectedProductForFulfillment ?: return
         val customerId = KycViewModel.profileId
 
@@ -224,6 +229,8 @@ class ProductViewModel(application: android.app.Application) : androidx.lifecycl
                 val authHeader = "Bearer ${SessionManager.bearerToken}"
                 val request = ProductRequest(customerId, listOf(product.id))
 
+                android.util.Log.d("Fulfillment", "Fulfillment Request: customerId=$customerId, productIds=${request.productIds}")
+
                 // Final step: calling take-up after payment
                 val response = retrofitManager.service.productTakeUp(authHeader, request)
                 android.util.Log.d("Fulfillment", "Backend Take-up Response: $response")
@@ -253,7 +260,7 @@ class ProductViewModel(application: android.app.Application) : androidx.lifecycl
                 if (failedRequiredResults.isEmpty()) {
                     val finalSubscriptionId = response.subscriptionId ?: (1000L..9999L).random()
                     storedSubscriptionId = finalSubscriptionId
-                    
+
                     fulfillmentUiState = FulfillmentUiState.Success(finalSubscriptionId)
                     saveDate()
                     NotificationViewModel.addNotification(
@@ -268,9 +275,14 @@ class ProductViewModel(application: android.app.Application) : androidx.lifecycl
                     AnalyticsManager.logEvent("product_take_up_success", bundle)
                     onComplete?.invoke()
                 } else {
-                    fulfillmentUiState = FulfillmentUiState.Error("Verification Incomplete", failedRequiredResults)
+                    fulfillmentUiState = FulfillmentUiState.Error("Subscription Incomplete", failedRequiredResults)
                 }
+            } catch (e: retrofit2.HttpException) {
+                val errorBody = e.response()?.errorBody()?.string()
+                android.util.Log.e("Fulfillment", "Fulfillment Error (HTTP ${e.code()}): $errorBody")
+                fulfillmentUiState = FulfillmentUiState.Error("Subscription failed (Server Error). Please contact support.")
             } catch (e: Exception) {
+                android.util.Log.e("Fulfillment", "Fulfillment Error: ${e.message}", e)
                 fulfillmentUiState = FulfillmentUiState.Error("Take-up failed: ${e.message}")
             }
         }

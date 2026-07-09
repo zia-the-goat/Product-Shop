@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.productshop.data.model.ProductDto
 import com.example.productshop.ui.viewmodel.ProductViewModel
+import com.example.productshop.ui.viewmodel.FulfillmentUiState
+import com.example.productshop.data.model.FulfilmentResultDto
 import com.example.productshop.util.AnalyticsManager
 import com.example.productshop.ui.viewmodel.AuthViewModel
 import com.example.productshop.ui.viewmodel.KycViewModel
@@ -64,7 +66,7 @@ fun ProductDetailScreenPreview() {
             onHome = {},
             onApply = {},
             onProductClick = {},
-            onLoginRedirect = {},
+            onLoginRedirect = { _ -> },
             onKycRedirect = {}
         )
     }
@@ -82,12 +84,13 @@ fun ProductDetailScreen(
     onHome: () -> Unit,
     onApply: () -> Unit,
     onProductClick: (Long) -> Unit,
-    onLoginRedirect: () -> Unit,
+    onLoginRedirect: (Long) -> Unit,
     onKycRedirect: () -> Unit
 ) {
     val product = viewModel.products.find { it.id == productId }
     val isKycLoading = kycViewModel.uiState is KycUiState.Loading
     val isKycVerified = kycViewModel.kycStatus?.primaryIndicator == true
+    val fulfillmentUiState = viewModel.fulfillmentUiState
     
     var showGuestDialog by remember { mutableStateOf(false) }
     var showKycDialog by remember { mutableStateOf(false) }
@@ -100,7 +103,7 @@ fun ProductDetailScreen(
             confirmButton = {
                 Button(onClick = {
                     showGuestDialog = false
-                    onLoginRedirect()
+                    product?.let { onLoginRedirect(it.id) }
                 }) {
                     Text("Log In")
                 }
@@ -134,6 +137,30 @@ fun ProductDetailScreen(
         )
     }
 
+    if (fulfillmentUiState is FulfillmentUiState.Error) {
+        AlertDialog(
+            onDismissRequest = { viewModel.resetFulfillmentState() },
+            title = { Text(fulfillmentUiState.message) },
+            text = {
+                Column {
+                    if (fulfillmentUiState.failedChecks.isNotEmpty()) {
+                        fulfillmentUiState.failedChecks.forEach { check ->
+                            Text("• ${check.failureMessage ?: check.checkName}", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    } else {
+                        Text("An unexpected error occurred. Please try again later.")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.resetFulfillmentState() }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
     val context = androidx.compose.ui.platform.LocalContext.current
     val shareProduct: (ProductDto) -> Unit = { p ->
         val shareUri = "https://product-shop.ziauddeen-mohamad.workers.dev/?product=${p.id}"
@@ -149,6 +176,9 @@ fun ProductDetailScreen(
     LaunchedEffect(product) {
         product?.let {
             AnalyticsManager.logSelectContent("product_view", it.id.toString())
+            if (authViewModel.isGuest) {
+                com.example.productshop.security.SessionManager.pendingProductId = it.id
+            }
         }
         if (viewModel.products.isEmpty()) {
             viewModel.fetchProducts()
@@ -276,7 +306,7 @@ fun ProductDetailScreen(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Button(
-                        enabled = !isKycLoading,
+                        enabled = !isKycLoading && fulfillmentUiState !is FulfillmentUiState.Loading,
                         onClick = { 
                             when {
                                 authViewModel.isGuest -> {
@@ -296,7 +326,9 @@ fun ProductDetailScreen(
                                         price = product.price.toDouble()
                                     )
                                     viewModel.startFulfillment(product)
-                                    onApply()
+                                    viewModel.validateEligibility {
+                                        onApply()
+                                    }
                                 }
                             }
                         },
@@ -306,12 +338,20 @@ fun ProductDetailScreen(
                             .weight(1.2f),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                     ) {
-                        Text(
-                            text = productType.actionButtonText(),
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            maxLines = 1,
-                            softWrap = false
-                        )
+                        if (fulfillmentUiState is FulfillmentUiState.Loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text(
+                                text = productType.actionButtonText(),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
                 }
             }
